@@ -1,4 +1,5 @@
-#include <stddef.h> 
+#include <stddef.h>   /* defines NULL */
+#include <math.h>     /* floorf */
 #include "scene.h"
 
 /* A quadric object is GLU's helper for drawing cylinders, discs and
@@ -152,9 +153,19 @@ static void drawRoadside(void)
 }
 
 /* ------------------------------------------------------------------ */
-void drawScene(void)
+/* The road is only 400 units long, but the car drives forever. Instead
+ * of building an infinite road, we move the whole scene along with the
+ * car, in jumps of exactly SCENE_PERIOD. Because the scene looks
+ * identical after each jump, the viewer never notices it: like a
+ * treadmill whose belt pattern repeats. */
+void drawScene(float followX)
 {
-    drawGround();
-    drawRoad();
-    drawRoadside();
+    float snap = floorf(followX / SCENE_PERIOD) * SCENE_PERIOD;
+
+    glPushMatrix();
+        glTranslatef(snap, 0.0f, 0.0f);
+        drawGround();
+        drawRoad();
+        drawRoadside();
+    glPopMatrix();
 }
