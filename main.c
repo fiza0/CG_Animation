@@ -1,21 +1,28 @@
-#include <math.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include <math.h>
+#include <string.h>
 #include "scene.h"
+#include "cars.h"
+#include "transition.h"
+#include "hud.h"
 
 /* ------------------------------------------------------------------ */
 /* Car motion state                                                    */
 /* ------------------------------------------------------------------ */
-#define CAR_LANE_Z    -2.0f   /* centre of the far lane                  */
-#define WHEEL_RADIUS   0.4f
-#define WHEEL_WIDTH    0.3f
+#define MIN_SPEED        4.0f   /* units per second (about 14 km/h)   */
+#define MAX_SPEED       30.0f   /* about 108 km/h                     */
+#define SPEED_STEP       2.0f
+#define AUTO_ORBIT_RATE  8.0f   /* degrees per second for the 'c' key */
+#define WRAP_DISTANCE  (100.0f * SCENE_PERIOD)
 
-static float carX       = 0.0f;   /* position along the road            */
-static float carSpeed   = 12.0f;  /* units per second (about 43 km/h)   */
-static float wheelAngle = 0.0f;   /* degrees, grows as the car rolls    */
-static int   paused     = 0;
-static int   lastTime   = 0;      /* ms, from glutGet(GLUT_ELAPSED_TIME) */
-
-static GLUquadric *wheelQuad = NULL;
+static float  carX      = 0.0f;   /* position along the road            */
+static float  carSpeed  = 12.0f;  /* units per second (about 43 km/h)   */
+static double distance  = 0.0;    /* total distance driven, for wheels  */
+static int    paused    = 0;
+static int    autoOrbit = 0;
+static int    lastTime  = 0;      /* ms, from glutGet(GLUT_ELAPSED_TIME) */
+static int    winW = 1024, winH = 640;
 
 /* ------------------------------------------------------------------ */
 /* Orbit camera                                                        */
@@ -45,67 +52,19 @@ static void applyCamera(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Wheel: a tyre (cylinder), two hub caps (discs) and a bar across     */
-/* the face. The bar is what makes the rotation visible.               */
+/* The car of the current era, at carX, scaled by the timeline         */
 /* ------------------------------------------------------------------ */
-static void drawWheel(float x, float z)
+static void drawCurrentCar(void)
 {
+    float s = timelineCarScale();
+    if (s < 0.01f) return;   /* fully shrunk: nothing to draw */
+
     glPushMatrix();
-        glTranslatef(x, WHEEL_RADIUS, z);   /* wheel touches the road */
-
-        /* Rolling forward (+x) is a clockwise turn when seen from +z,
-         * which is a NEGATIVE rotation about the z axis (the axle). */
-        glRotatef(-wheelAngle, 0.0f, 0.0f, 1.0f);
-
-        glTranslatef(0.0f, 0.0f, -WHEEL_WIDTH / 2.0f); /* centre on axle */
-
-        glColor3f(0.08f, 0.08f, 0.08f);               /* tyre */
-        gluCylinder(wheelQuad, WHEEL_RADIUS, WHEEL_RADIUS, WHEEL_WIDTH, 24, 1);
-
-        glColor3f(0.75f, 0.75f, 0.78f);               /* hub caps */
-        gluQuadricOrientation(wheelQuad, GLU_INSIDE); /* inner face points -z */
-        gluDisk(wheelQuad, 0.0, WHEEL_RADIUS * 0.7, 24, 1);
-        gluQuadricOrientation(wheelQuad, GLU_OUTSIDE);
-        glTranslatef(0.0f, 0.0f, WHEEL_WIDTH);
-        gluDisk(wheelQuad, 0.0, WHEEL_RADIUS * 0.7, 24, 1);
-
-        glColor3f(0.15f, 0.15f, 0.15f);               /* spoke bars */
-        glTranslatef(0.0f, 0.0f, -WHEEL_WIDTH / 2.0f);
-        glPushMatrix();
-            glScalef(WHEEL_RADIUS * 1.3f, 0.07f, WHEEL_WIDTH + 0.02f);
-            glutSolidCube(1.0);
-        glPopMatrix();
-        glScalef(0.07f, WHEEL_RADIUS * 1.3f, WHEEL_WIDTH + 0.02f);
-        glutSolidCube(1.0);
-    glPopMatrix();
-}
-
-/* ------------------------------------------------------------------ */
-/* Placeholder car: two boxes and four wheels, drawn at carX           */
-/* ------------------------------------------------------------------ */
-static void drawPlaceholderCar(void)
-{
-    glPushMatrix();
-        glTranslatef(carX, 0.0f, CAR_LANE_Z);  /* move the whole car */
-
-        glColor3f(0.75f, 0.10f, 0.10f);
-        glPushMatrix();                         /* lower body: 4.5 x 0.8 x 1.8 */
-            glTranslatef(0.0f, 0.75f, 0.0f);
-            glScalef(4.5f, 0.8f, 1.8f);
-            glutSolidCube(1.0);
-        glPopMatrix();
-
-        glPushMatrix();                         /* cabin: 2.4 x 0.7 x 1.6 */
-            glTranslatef(-0.3f, 1.5f, 0.0f);
-            glScalef(2.4f, 0.7f, 1.6f);
-            glutSolidCube(1.0);
-        glPopMatrix();
-
-        /* Wheels poke slightly out of the body's sides (body half-width 0.9). */
-        drawWheel( 1.4f,  0.85f);   /* front, near side */
-        drawWheel( 1.4f, -0.85f);   /* front, far side  */
-        drawWheel(-1.4f,  0.85f);   /* rear,  near side */
-        drawWheel(-1.4f, -0.85f);   /* rear,  far side  */
+        glTranslatef(carX, 0.0f, CAR_LANE_Z);   /* move the whole car */
+        /* Scaling about the car's own origin, which sits on the road,
+         * makes it shrink down into its base rather than float away. */
+        glScalef(s, s, s);
+        drawCar(getCarModel(timelineModelIndex()), distance);
     glPopMatrix();
 }
 
@@ -114,18 +73,20 @@ static void drawPlaceholderCar(void)
 /* ------------------------------------------------------------------ */
 static void update(float dt)
 {
-    float distance = carSpeed * dt;       /* distance = speed x time */
-    carX += distance;
-
-    /* Rolling without slipping: the arc length the tyre turns through
-     * equals the distance travelled, so angle (radians) = distance / r. */
-    wheelAngle += (distance / WHEEL_RADIUS) * 180.0f / (float)M_PI;
-    if (wheelAngle >= 360.0f) wheelAngle = fmodf(wheelAngle, 360.0f);
+    float step = carSpeed * dt;       /* distance = speed x time */
+    carX     += step;
+    distance += step;
 
     /* Floats lose precision as numbers grow, so after a long run the
      * car would start to jitter. Pulling carX back by a multiple of
-     * SCENE_PERIOD is invisible, because the scene repeats exactly. */
-    if (carX > 100.0f * SCENE_PERIOD) carX -= 100.0f * SCENE_PERIOD;
+     * SCENE_PERIOD is invisible, because the scene repeats exactly.
+     * Tunnels live in world coordinates, so they move back too. */
+    if (carX > WRAP_DISTANCE) {
+        carX -= WRAP_DISTANCE;
+        timelineShiftWorld(-WRAP_DISTANCE);
+    }
+
+    updateTimeline(dt, carX);
 }
 
 /* Called about 60 times per second. Delta time (dt) is the real time
@@ -140,6 +101,10 @@ static void timer(int value)
 
     if (dt > 0.1f) dt = 0.1f;   /* avoid a big jump after a stall */
     if (!paused) update(dt);
+
+    /* The automatic orbit keeps turning while paused, which is handy
+     * for looking at a frozen car from every side. */
+    if (autoOrbit) camYaw = fmodf(camYaw + AUTO_ORBIT_RATE * dt, 360.0f);
 
     glutPostRedisplay();
     glutTimerFunc(16, timer, 0);
@@ -157,7 +122,10 @@ static void display(void)
     applyCamera();       /* 1. position the camera                  */
     setupLighting();     /* 2. place the sun in world coordinates   */
     drawScene(carX);     /* 3. draw the world around the car        */
-    drawPlaceholderCar();
+    drawTunnels();       /* 4. time tunnels, also in the world      */
+    drawCurrentCar();    /* 5. the car itself                       */
+    drawParticles(carX); /* 6. see-through effects after solid ones */
+    drawHUD(winW, winH, carSpeed, paused, autoOrbit);  /* 7. overlay */
 
     glutSwapBuffers();
 }
@@ -165,6 +133,8 @@ static void display(void)
 static void reshape(int w, int h)
 {
     if (h == 0) h = 1;
+    winW = w;            /* the HUD needs the window size in pixels */
+    winH = h;
     glViewport(0, 0, w, h);
 
     glMatrixMode(GL_PROJECTION);
@@ -193,13 +163,21 @@ static void keyboard(unsigned char key, int x, int y)
 {
     (void)x; (void)y;
     switch (key) {
-        case '+': case '=': camDistance -= 1.0f; break;
-        case '-': case '_': camDistance += 1.0f; break;
-        case ' ': paused = !paused;              break;  /* pause / resume */
-        case 27:  exit(0);                                /* Esc quits      */
+        case '+': case '=': camDistance -= 1.0f;     break;
+        case '-': case '_': camDistance += 1.0f;     break;
+        case ' ':           paused = !paused;        break;  /* pause / resume  */
+        case 'n': case 'N': timelineNext();          break;  /* next era now    */
+        case 'r': case 'R': timelineRestart();       break;  /* first era again */
+        case 't': case 'T': timelineToggleEffect();  break;  /* tunnel / scale  */
+        case 'c': case 'C': autoOrbit = !autoOrbit;  break;  /* camera orbit    */
+        case '[':           carSpeed -= SPEED_STEP;  break;
+        case ']':           carSpeed += SPEED_STEP;  break;
+        case 27:            exit(0);                          /* Esc quits       */
     }
     if (camDistance < 5.0f)  camDistance = 5.0f;
     if (camDistance > 60.0f) camDistance = 60.0f;
+    if (carSpeed < MIN_SPEED) carSpeed = MIN_SPEED;
+    if (carSpeed > MAX_SPEED) carSpeed = MAX_SPEED;
 }
 
 /* ------------------------------------------------------------------ */
@@ -207,12 +185,12 @@ int main(int argc, char **argv)
 {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-    glutInitWindowSize(1024, 640);
+    glutInitWindowSize(winW, winH);
     glutCreateWindow("Mercedes-Benz: Evolution by Decade");
 
     initScene();
-    wheelQuad = gluNewQuadric();
-    gluQuadricNormals(wheelQuad, GLU_SMOOTH);
+    initCars();       /* tessellate every body into a display list */
+    initTimeline();
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
