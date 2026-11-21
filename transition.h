@@ -18,7 +18,7 @@ void updateTimeline(float dt, float carX);   /* call every frame */
 void timelineShiftWorld(float dx);
 
 /* Keyboard actions. */
-void timelineNext(void);           /* start the next transition now    */
+void timelineNext(void);           /* next transition now, or queued   */
 void timelineRestart(void);        /* back to the first era            */
 void timelineToggleEffect(void);   /* tunnel <-> scale swap            */
 
@@ -29,6 +29,12 @@ int         timelineTravelling(void);   /* 1 between start and swap      */
 float       timelineProgress(void);     /* 0..1 of the way to the target */
 float       timelineCarScale(void);     /* 1, or less during scale swap  */
 const char *timelineEffectName(void);
+
+/* The background ripple started at the last model swap. The era theme
+ * to draw is timelineModelIndex(); while ripple->active, the scene also
+ * blends in the previous theme, ripple->fromEra. */
+struct RippleState;
+const struct RippleState *timelineRipple(void);
 
 /* Drawing. Tunnels are opaque and drawn before the car; particles are
  * see-through and drawn after it. */

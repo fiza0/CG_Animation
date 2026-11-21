@@ -4,6 +4,7 @@
 #include <string.h>   /* memset */
 #include "transition.h"
 #include "cars.h"
+#include "eras.h"
 
 /* ------------------------------------------------------------------ */
 /* Timing (seconds)                                                    */
@@ -41,7 +42,11 @@
 typedef enum { PHASE_DRIVE, PHASE_TRANSITION } Phase;
 enum { FX_TUNNEL, FX_SCALE };
 
-typedef struct { float x; int alive; } Tunnel;   /* x = entrance */
+typedef struct {
+    float x;             /* entrance */
+    float color[3];      /* portal glow, from the destination era */
+    int   alive;
+} Tunnel;
 
 typedef struct {
     float x, y, z;       /* relative to the car, so the burst moves with it */
@@ -61,13 +66,18 @@ static float lastCarX     = 0.0f;
 static float startX       = 0.0f;        /* car x when the transition began */
 static float swapX        = 0.0f;        /* tunnel: swap when the car gets here */
 
+static int   pendingNext  = 0;           /* 'n' pressed while busy: run it later */
+
+/* The background ripple, started at the moment of the model swap. */
+static RippleState ripple;
+
 static Tunnel   tunnels[MAX_TUNNELS];
 static Particle particles[MAX_PARTICLES];
 
 /* ------------------------------------------------------------------ */
 /* Tunnels and particles                                               */
 /* ------------------------------------------------------------------ */
-static void spawnTunnel(float x)
+static void spawnTunnel(float x, const float color[3])
 {
     /* Reuse a free slot, or else the tunnel furthest behind the car. */
     int slot = 0;
@@ -77,6 +87,7 @@ static void spawnTunnel(float x)
     }
     tunnels[slot].x = x;
     tunnels[slot].alive = 1;
+    memcpy(tunnels[slot].color, color, sizeof tunnels[slot].color);
 }
 
 static float frand(void) { return (float)rand() / (float)RAND_MAX; }
@@ -113,9 +124,16 @@ static void updateParticles(float dt)
 /* ------------------------------------------------------------------ */
 /* State machine                                                       */
 /* ------------------------------------------------------------------ */
+/* A new transition may only start once the previous ripple has
+ * finished, so two background changes never overlap. */
+static int canBegin(void)
+{
+    return phase == PHASE_DRIVE && !ripple.active;
+}
+
 static void beginTransition(void)
 {
-    if (phase == PHASE_TRANSITION) return;
+    if (!canBegin()) return;
 
     phase        = PHASE_TRANSITION;
     phaseTime    = 0.0f;
@@ -130,16 +148,47 @@ static void beginTransition(void)
          * centre reaches the middle of the tunnel: since the tunnel is
          * longer than any car, the whole car is hidden at that moment. */
         float entrance = lastCarX + TUNNEL_LEAD;
-        spawnTunnel(entrance);
+        spawnTunnel(entrance, getEraTheme(target)->portal);
         swapX = entrance + 0.5f * TUNNEL_LENGTH;
     }
 }
 
+/* Start the background ripple. The background only learns where and
+ * when the swap happened, not which car effect caused it. */
+static void startRipple(float x, float z, int from, int to)
+{
+    ripple.active  = 1;
+    ripple.fromEra = from;
+    ripple.toEra   = to;
+    ripple.cx      = x;
+    ripple.cz      = z;
+    ripple.time    = 0.0f;
+}
+
 static void doSwap(void)
 {
+    int from = current;
     current = target;
     swapped = 1;
+
+    /* Tunnel: the wave starts from the middle of the tunnel. Scale
+     * swap: from the spot where the car vanished. */
+    float cx = (activeEffect == FX_TUNNEL) ? swapX : lastCarX;
+    startRipple(cx, CAR_LANE_Z, from, current);
+
     if (activeEffect == FX_SCALE) burstParticles();
+}
+
+/* The ripple ends once its fully changed zone has passed everything
+ * that could still be seen: the fog limit seen from the farthest
+ * camera, measured from wherever the car has got to by now. */
+static void updateRipple(float dt, float carX)
+{
+    if (!ripple.active) return;
+    ripple.time += dt;
+    float reach = RIPPLE_VISIBLE + RIPPLE_RAMP + fabsf(carX - ripple.cx);
+    if (rippleRadius(&ripple) > reach && ripple.time >= RIPPLE_BLEND_TIME)
+        ripple.active = 0;
 }
 
 void initTimeline(void)
@@ -158,6 +207,7 @@ void updateTimeline(float dt, float carX)
     if (glowClock > cycle) glowClock -= cycle;
 
     updateParticles(dt);
+    updateRipple(dt, carX);
 
     /* Forget tunnels that are far behind and long out of sight. */
     for (int i = 0; i < MAX_TUNNELS; i++)
@@ -167,7 +217,10 @@ void updateTimeline(float dt, float carX)
     phaseTime += dt;
 
     if (phase == PHASE_DRIVE) {
-        if (phaseTime >= DRIVE_TIME) beginTransition();
+        /* Waits here if the previous ripple is still running. */
+        if (pendingNext || phaseTime >= DRIVE_TIME) {
+            if (canBegin()) { pendingNext = 0; beginTransition(); }
+        }
         return;
     }
 
@@ -185,12 +238,19 @@ void updateTimeline(float dt, float carX)
 void timelineShiftWorld(float dx)
 {
     for (int i = 0; i < MAX_TUNNELS; i++) tunnels[i].x += dx;
-    swapX    += dx;
-    startX   += dx;
+    swapX     += dx;
+    startX    += dx;
+    ripple.cx += dx;
     lastCarX += dx;
 }
 
-void timelineNext(void) { beginTransition(); }
+/* 'n': start now if possible, otherwise remember the request (only one,
+ * however often the key is pressed) and start as soon as allowed. */
+void timelineNext(void)
+{
+    if (canBegin()) beginTransition();
+    else            pendingNext = 1;
+}
 
 void timelineRestart(void)
 {
@@ -199,6 +259,8 @@ void timelineRestart(void)
     current   = 0;
     target    = 0;
     swapped   = 0;
+    pendingNext = 0;
+    memset(&ripple,   0, sizeof ripple);       /* first era, no ripple */
     memset(tunnels,   0, sizeof tunnels);
     memset(particles, 0, sizeof particles);
 }
@@ -214,6 +276,7 @@ void timelineToggleEffect(void)
 /* Queries                                                             */
 /* ------------------------------------------------------------------ */
 int timelineModelIndex(void)  { return current; }
+const RippleState *timelineRipple(void) { return &ripple; }
 int timelineTargetIndex(void) { return target; }
 int timelineTravelling(void)  { return phase == PHASE_TRANSITION && !swapped; }
 
@@ -265,9 +328,10 @@ static void box(float cx, float cy, float cz, float sx, float sy, float sz)
 }
 
 /* Glowing frame around one tunnel opening. Lighting is switched off so
- * the colour is shown at full strength, and the colour drifts between
- * cyan and violet with a sine wave, so it reads as an energy portal. */
-static void portal(float x)
+ * the colour is shown at full strength. The colour is the destination
+ * era's (amber for the early years, cool white-blue for today) and a
+ * sine wave pulses it towards white, so it reads as an energy portal. */
+static void portal(float x, const float c[3])
 {
     float k    = 0.5f + 0.5f * sinf(glowClock * PORTAL_PULSE);
     float half = TUNNEL_INNER_HALF + TUNNEL_WALL;   /* outer half-width */
@@ -276,7 +340,9 @@ static void portal(float x)
     float zc   = CAR_LANE_Z;
 
     glDisable(GL_LIGHTING);
-    glColor3f(0.2f + 0.5f * k, 0.9f - 0.5f * k, 1.0f);
+    float w    = 0.35f * k;                         /* share of white */
+    glColor3f(c[0] + (1.0f - c[0]) * w, c[1] + (1.0f - c[1]) * w,
+              c[2] + (1.0f - c[2]) * w);
     box(x, 0.5f * (top + t), zc - half - 0.5f * t, t, top + t, t);   /* posts  */
     box(x, 0.5f * (top + t), zc + half + 0.5f * t, t, top + t, t);
     box(x, top + 0.5f * t,   zc, t, t, 2.0f * (half + t));          /* lintel */
@@ -285,8 +351,9 @@ static void portal(float x)
 
 /* Two walls and a roof made of boxes. The roof hides the car from a
  * high camera, so the swap stays invisible from any orbit angle. */
-static void drawTunnel(float x)
+static void drawTunnel(const Tunnel *tn)
 {
+    float x  = tn->x;
     float L  = TUNNEL_LENGTH;
     float cx = x + 0.5f * L;
     float zc = CAR_LANE_Z;
@@ -298,14 +365,14 @@ static void drawTunnel(float x)
     box(cx, 0.5f * H, zc + in + 0.5f * w, L, H, w);    /* near wall */
     box(cx, H + 0.5f * R, zc, L, R, 2.0f * (in + w));  /* roof      */
 
-    portal(x);
-    portal(x + L);
+    portal(x, tn->color);
+    portal(x + L, tn->color);
 }
 
 void drawTunnels(void)
 {
     for (int i = 0; i < MAX_TUNNELS; i++)
-        if (tunnels[i].alive) drawTunnel(tunnels[i].x);
+        if (tunnels[i].alive) drawTunnel(&tunnels[i]);
 }
 
 /* Particles fade out through alpha blending. They do not write to the

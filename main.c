@@ -6,6 +6,8 @@
 #include "cars.h"
 #include "transition.h"
 #include "hud.h"
+#include "eras.h"
+#include "props.h"
 
 /* ------------------------------------------------------------------ */
 /* Car motion state                                                    */
@@ -14,7 +16,7 @@
 #define MAX_SPEED       30.0f   /* about 108 km/h                     */
 #define SPEED_STEP       2.0f
 #define AUTO_ORBIT_RATE  8.0f   /* degrees per second for the 'c' key */
-#define WRAP_DISTANCE  (100.0f * SCENE_PERIOD)
+#define WRAP_DISTANCE  (20.0f * SCENE_PERIOD)   /* 1920 m, a whole number of periods */
 
 static float  carX      = 0.0f;   /* position along the road            */
 static float  carSpeed  = 12.0f;  /* units per second (about 43 km/h)   */
@@ -87,6 +89,7 @@ static void update(float dt)
     }
 
     updateTimeline(dt, carX);
+    updateProps(dt);     /* turbine rotors */
 }
 
 /* Called about 60 times per second. Delta time (dt) is the real time
@@ -115,17 +118,31 @@ static void timer(int value)
 /* ------------------------------------------------------------------ */
 static void display(void)
 {
+    /* The era theme follows the car model. While a ripple runs, the
+     * previous era is still visible further out, and the global look
+     * (sky, fog, light) blends from the old theme to the new one. */
+    const EraTheme    *cur  = getEraTheme(timelineModelIndex());
+    const RippleState *rip  = timelineRipple();
+    const EraTheme    *prev = rip->active ? getEraTheme(rip->fromEra) : NULL;
+
+    EraTheme look;
+    if (prev) blendThemeGlobals(&look, prev, cur, rippleGlobalFactor(rip));
+    else      look = *cur;
+
+    applyThemeGlobals(&look);   /* sky and fog colour, before clearing */
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    applyCamera();       /* 1. position the camera                  */
-    setupLighting();     /* 2. place the sun in world coordinates   */
-    drawScene(carX);     /* 3. draw the world around the car        */
-    drawTunnels();       /* 4. time tunnels, also in the world      */
-    drawCurrentCar();    /* 5. the car itself                       */
-    drawParticles(carX); /* 6. see-through effects after solid ones */
-    drawHUD(winW, winH, carSpeed, paused, autoOrbit);  /* 7. overlay */
+    applyCamera();                       /* 1. position the camera             */
+    setupLighting(&look);                /* 2. sun in world coordinates        */
+    drawBackdrop(carX, cur, prev, rip);  /* 3. distant skyline                 */
+    drawScene(carX, cur, prev, rip);     /* 4. ground, road, roadside objects  */
+    drawTunnels();                       /* 5. time tunnels, also in the world */
+    drawCurrentCar();                    /* 6. the car itself                  */
+    drawRippleRing(rip, cur->portal);    /* 7. see-through effects last        */
+    drawParticles(carX);
+    drawHUD(winW, winH, carSpeed, paused, autoOrbit);  /* 8. overlay */
 
     glutSwapBuffers();
 }
