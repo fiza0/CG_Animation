@@ -12,6 +12,12 @@
 /* A quadric object is GLU's helper for drawing cylinders and discs. */
 static GLUquadric *quad = NULL;
 
+/* In model inspection mode the near-side props are hidden, so they
+ * never stand between the camera and the car. */
+static int hideNearSide = 0;
+
+void sceneHideNearSide(int hide) { hideNearSide = hide; }
+
 /* ------------------------------------------------------------------ */
 /* Initialisation: OpenGL state that never changes                    */
 /* ------------------------------------------------------------------ */
@@ -26,6 +32,16 @@ void initScene(void)
     glEnable(GL_LIGHT0);
     glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+
+    /* Specular highlights: compute them from the real eye position (a
+     * local viewer), so they slide over curved panels as the camera
+     * moves, and add them on top of the lit, coloured surface as a
+     * separate step (separate specular), so highlights stay white even
+     * on dark or red paint. */
+    glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+#ifdef GL_LIGHT_MODEL_COLOR_CONTROL
+    glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL, GL_SEPARATE_SPECULAR_COLOR);
+#endif
 
     /* Linear fog: objects blend into the sky with distance. The colour
      * and distances come from the era theme every frame. */
@@ -68,6 +84,9 @@ void setupLighting(const EraTheme *t)
     glLightfv(GL_LIGHT0, GL_POSITION, sunDir);
     glLightfv(GL_LIGHT0, GL_DIFFUSE,  sunColor);
     glLightfv(GL_LIGHT0, GL_AMBIENT,  ambient);
+    /* The sun's highlight has the sun's colour (warm in the early eras,
+     * cool white today). Only the cars have specular materials. */
+    glLightfv(GL_LIGHT0, GL_SPECULAR, sunColor);
 }
 
 /* ------------------------------------------------------------------ */
@@ -242,11 +261,13 @@ static void drawStripProps(const EraTheme *t, float x0, int slot,
 
     /* Rows start at the slot start and run 12 m; measure the ripple
      * distance from their middle. */
-    placeProp(t->rowProps[ROW_NEAR], x0, ROW_NEAR_Z, xm, rip, isOld);
+    if (!hideNearSide)
+        placeProp(t->rowProps[ROW_NEAR], x0, ROW_NEAR_Z, xm, rip, isOld);
     placeProp(t->rowProps[ROW_FAR],  x0, ROW_FAR_Z,  xm, rip, isOld);
 
     const int *sp = t->slotProps[slot];
-    placeProp(sp[COL_NEAR], xm, SLOT_NEAR_Z, xm, rip, isOld);
+    if (!hideNearSide)
+        placeProp(sp[COL_NEAR], xm, SLOT_NEAR_Z, xm, rip, isOld);
     placeProp(sp[COL_FAR],  xm, SLOT_FAR_Z,  xm, rip, isOld);
 
     float backZ = (sp[COL_BACK] == PROP_TURBINE) ? TURBINE_Z

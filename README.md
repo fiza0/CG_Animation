@@ -16,7 +16,7 @@ All geometry is procedural: no model files, textures or external libraries.
 Uses the OpenGL and GLUT frameworks that ship with macOS:
 
 ```sh
-clang main.c scene.c cars.c transition.c hud.c eras.c props.c -o car -framework OpenGL -framework GLUT && ./car
+clang *.c models/*.c -o car -framework OpenGL -framework GLUT && ./car
 ```
 
 In VS Code the same command is the default build task (`Cmd+Shift+B`).
@@ -33,6 +33,9 @@ In VS Code the same command is the default build task (`Cmd+Shift+B`).
 | `t` | Toggle the transition style (scale swap, the default, or time tunnel) for the next transition |
 | `c` | Toggle a slow automatic camera orbit |
 | `[` / `]` | Slower / faster (about 14 to 108 km/h) |
+| `m` | Model inspection: stop the timeline on the current car (it keeps driving) and hide the near-side roadside objects. Press again to resume |
+| `,` / `.` | Previous / next model while inspecting (instant swap) |
+| `v` | Cycle camera presets: side view, front three-quarter, rear three-quarter, low front, top-down. The arrow keys still adjust from there |
 | Esc | Quit |
 
 ## Eras
@@ -51,8 +54,23 @@ In VS Code the same command is the default build task (`Cmd+Shift+B`).
 | 2013 | S-Class (W222) |
 | 2021 | EQS |
 
-The shapes are simplified side silhouettes with approximate dimensions. No
-badges or logos are drawn.
+Dimensions are approximate; silhouette, proportions and signature details are
+what make each car recognisable. No emblems, badges, lettering or real number
+plates are drawn (plates are blank).
+
+| Car | Signature features |
+|---|---|
+| 1886 Patent-Motorwagen | Bent-tube frame, three wire wheels (small front, large rear), tiller with crank handle, high bench seat, horizontal flywheel that spins as the car moves, belt and chain drive, water tank |
+| 1901 Mercedes 35 HP | Low pressed-steel frame, flat honeycomb radiator, long louvred bonnet, raked column with a big wooden wheel, two rows of high seats, brass carbide lamps and bulb horn, side levers, mudguards, goggled driver, artillery wheels |
+| 1936 540K Cabriolet | Very long bonnet with chrome hinge and louvres, three chrome exhaust pipes each side, tall V grille, flowing black wings into running boards, free-standing headlamps, fog lamps and horns, side-mounted spare wheels, V windscreen, folded hood, luggage trunk, cream and black two-tone |
+| 1954 300 SL Gullwing | Low coupe, two power domes, wide low grille with one thick bar, faired round headlamps, eyebrows over the arches, gill vents with chrome bars, gullwing seams over the roof, red interior |
+| 1963 230 SL Pagoda | Slab sides, tall stacked headlamp units, wide low grille, white hardtop with a dished roof and thin pillars, vertical overriders, upright tail lamps |
+| 1976 W123 | Boxy three-box saloon, tall glasshouse with chrome frames and a quarter window, wide headlamp units beside a tall flat-topped grille, chrome bumpers with rubber strips, ribbed tail lamps, ribbed hubcaps |
+| 1982 190E | Wedge with a high kicked-up boot, narrow headlamps, small grille, grey side cladding, grey bumper covers, monowiper, 15-hole alloys |
+| 1995 W210 | Rounded saloon, twin oval headlamps per side, slanted grille in a body-colour bumper, wrap-around tail lamps, oval handles, 8-hole alloys |
+| 2002 W211 | Arched roof, twin ovals under one clear teardrop cover, raked grille, chrome window surround, clear-and-red tail lamps, five-twin-spoke alloys with brakes |
+| 2013 S-Class | Long wheelbase, large upright chrome grille, slim lamps with three LED strips, shoulder crease and dropping lower line, wide LED tail lamps, ten-spoke wheels |
+| 2021 EQS | One-bow arc, cab-forward stance, gloss-black front panel, light bands across front and rear, flush handles, frameless windows, black lower section, aero wheels, no exhaust |
 
 ## Era themes
 
@@ -88,37 +106,87 @@ logos.
 | `scene.c/.h` | Ground and road strips, markings, prop placement, lighting, fog, skyline backdrop and ripple ring |
 | `eras.c/.h` | Era theme table, colour blending and ripple progress maths |
 | `props.c/.h` | Roadside objects and skylines, compiled into display lists |
-| `cars.c/.h` | Car model table and the generic car renderer |
+| `cars.c/.h` | Car model table, public interface, display lists, wheel placement |
+| `models/car_YYYY.c` | One file per car: its shape data and build functions |
+| `geom.c/.h` | Geometry toolkit: splines, lofts, sweeps, tubes, revolves, rounded boxes, surface decals |
+| `materials.c/.h` | Material table (specular, shininess, emission) and `setMaterial()` |
+| `wheels.c/.h` | Revolved tyres and the nine rim styles |
+| `carparts.c/.h` | Parts many cars share: lamps, plates, mirrors, wipers, seats, steering wheels, driver figure, wheel wells, and the closed-car body framework |
 | `transition.c/.h` | Timeline state machine, time tunnel, scale swap and particles |
 | `hud.c/.h` | 2D text overlay |
 
 ## Techniques
 
-**Extruded side profiles.** Each car body is described by its side silhouette:
-a list of 15 to 40 (x, y) points. The renderer pushes this outline across the
-car's width. The two flat side caps are the outline itself; the walls are one
-quad per outline edge, whose normal is the edge direction crossed with the z
-axis. Neighbouring walls that meet at a shallow angle share a blended normal so
-curves look smooth, while sharp corners keep a crisp edge. Each edge also
-carries a style (body, glass, chrome, trim, lamp), which colours that strip of
-wall. This is how windscreens, bumpers and lights appear without extra
-geometry. Wheel arches are generated automatically: an edge marked as an arch is
-replaced by a half circle around the nearest wheel.
+### Car modelling
 
-**GLU tessellation.** The silhouettes are concave (wheel arches, windscreen
-dips), so `GL_POLYGON` or a triangle fan would fill them wrongly. The GLU
-tessellator splits each outline into triangles. Side windows are a second,
-smaller tessellated outline placed just outside the body so the two surfaces do
-not fight in the depth buffer.
+**Splines.** Every profile is described by 8 to 20 control points. Between two
+points a cubic curve is used whose slopes come from the neighbouring points
+(Catmull-Rom style), so the shape passes through every point and bends smoothly.
+The same idea in 3D gives smooth paths for tubes and wings.
 
-**Display lists.** Tessellation runs once at start-up. The resulting body,
-fenders and windows of each model are recorded in a display list, so drawing a
-body each frame is a single `glCallList`.
+**Lofted bodies.** A body is a chain of cross-sections along the car (60 to 90
+of them), joined into one skin with quads. Each cross-section is a
+superellipse, a rounded rectangle whose roundness goes from an ellipse to an
+almost sharp box, between a bottom and a top height, and narrower at the top
+than at the bottom (tumblehome). Five spline functions along x give the bottom,
+top, half-width, top half-width and roundness, so a body can taper to a nose,
+rise over a bonnet or drop into a tail. Raising the bottom into a half-circle
+around each axle cuts the wheel arches; a dark liner and a dark block behind
+them make a real wheel well. Vertex normals come from two tangents on the
+surface (along the car and around the section); their cross product is flipped
+if it points inwards, so every normal points out and the curves shade
+smoothly.
 
-**Data-driven models.** One `CarModel` struct per era (profile, window, colours,
-wheel layout and an optional `drawDetails` function for era extras such as
-seats, a tiller, spare wheels, chrome bumpers or LED light strips). Adding an
-era means adding data, not new rendering code.
+**Glasshouse.** Closed cars have a second, narrower loft for the cabin. Each of
+its quads is sorted by position and normal: the roof and the pillars are drawn
+with the body, the rest becomes glass. The windscreen and rear window are the
+two ends; where those surfaces turn sideways they become the A and C pillars.
+
+**Sweeps, tubes and revolves.** A cross-section swept along a smooth path makes
+wings, mudguards, bumpers, exhaust pipes, eyebrows and light bands. Straight
+tubes make frames, spokes, columns and stays. Spinning an (r, z) profile around
+an axis makes tyres, lamp bowls, lenses, hubcaps, horns and filler caps; a
+repeated point in a profile makes a sharp crease.
+
+**Decals.** Panel gaps, door handles, window seals, chrome strips, cladding,
+louvres, lamps and plates are laid on the body surface: the loft can report any
+surface point and its normal, and a local frame built from that normal places
+flat shapes a few millimetres outside the surface, so they never fight with it
+in the depth buffer.
+
+**Materials and specular lighting.** `GL_COLOR_MATERIAL` still sets the
+diffuse colour; `setMaterial()` adds a specular highlight and shininess (paint,
+chrome, glass, rubber, leather, wood, brass...) and emission for lamp lenses, so
+lamps look lit. The sun has a specular colour that follows the era theme, a
+local viewer makes highlights slide over curved panels as the camera moves, and
+separate specular keeps highlights white on coloured paint. Specular and
+emission are reset after each car, so scenery is not affected.
+
+**Glass pass.** Interiors (seats, dashboards, steering wheels, drivers in the
+open cars) are solid geometry. Each car's glass is a separate display list,
+drawn semi-transparent with blending on and depth writes off, after everything
+solid in the frame and before the ripple ring, particles and HUD, so the
+interior shows through and the glass never hides anything drawn later.
+
+**Wheels.** Tyres are revolved with rounded shoulders and sidewalls: tall and
+thin on the early cars, wide and low on the modern ones (with tread grooves).
+Rim styles: laced wire spokes (1886, 1936), wooden artillery spokes with a
+brass cap (1901), painted steel with chrome cap and ring (1954, 1963), ribbed
+full hubcap (1976), 15-hole (1982) and 8-hole (1995) alloys, five twin spokes
+(2002) and ten spokes (2013) with brake disc and calliper, and a nearly closed
+aero disc (2021). Each wheel is a display list drawn four (or three) times with
+its rotation; the calliper has its own list so it does not turn.
+
+**Display lists.** Each car's static geometry is built once at start-up into one
+list (plus one for its glass and one per wheel size), so a frame only replays
+them. Only moving parts (the 1886 flywheel) are drawn fresh every frame.
+
+**One file per car.** Each `models/car_YYYY.c` fills in a `CarModel`: name,
+length, colours, axles, wheel specs and its build functions. The shared parts
+live in `geom.c`, `wheels.c` and `carparts.c`, so a car file only describes what
+makes that car itself.
+
+### Animation and scene
 
 **Timeline state machine.** `DRIVE` (4 s) shows the current model. `TRANSITION`
 (about 2.5 s) runs the effect and swaps to the next model at the right moment.
@@ -128,7 +196,7 @@ All durations are named constants at the top of `transition.c`.
 is placed ahead of the car in world coordinates. The car never slows down; it
 just drives in. The model is swapped when the car's centre reaches the middle
 of the tunnel. Because the tunnel is longer than any car, the whole car is
-hidden at that moment, and the roof hides it from high camera angles too. The
+hidden at that moment (its length follows the longest car), and the roof hides it from high camera angles too. The
 entrances have frames drawn without lighting, in a colour that pulses with a
 sine wave. The tunnel stays behind as the car drives on and is removed once it
 is far out of view.

@@ -8,8 +8,8 @@
 #include "transition.h"
 
 #define STRIP_MARGIN  48     /* gap between the strip ends and the window edge */
-#define STRIP_Y       74     /* height of the year markers above the bottom    */
-#define LABEL_Y       50     /* height of the year labels                      */
+#define STRIP_Y       88     /* height of the year markers above the bottom    */
+#define LABEL_Y       64     /* height of the year labels                      */
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -48,9 +48,10 @@ static void rect(float x0, float y0, float x1, float y1, GLenum mode)
 /* ------------------------------------------------------------------ */
 /* Top left: current era, or where we are travelling to               */
 /* ------------------------------------------------------------------ */
-static void drawTitle(int h, float speed, int paused, int autoOrbit)
+static void drawTitle(int h, float speed, int paused, int autoOrbit,
+                      const char *viewName)
 {
-    char title[96], status[128];
+    char title[96], status[200], view[48] = "";
     const CarModel *cur = getCarModel(timelineModelIndex());
 
     if (timelineTravelling())
@@ -59,10 +60,13 @@ static void drawTitle(int h, float speed, int paused, int autoOrbit)
     else
         snprintf(title, sizeof title, "%s: %s", cur->year, cur->name);
 
-    snprintf(status, sizeof status, "Transition: %s    Speed: %.0f km/h%s%s",
+    if (viewName) snprintf(view, sizeof view, "    View: %s", viewName);
+    snprintf(status, sizeof status, "Transition: %s    Speed: %.0f km/h%s%s%s%s",
              timelineEffectName(), speed * 3.6f,
-             paused    ? "    PAUSED"     : "",
-             autoOrbit ? "    AUTO ORBIT" : "");
+             paused                ? "    PAUSED"     : "",
+             autoOrbit             ? "    AUTO ORBIT" : "",
+             timelineInspecting()  ? "    INSPECTING" : "",
+             view);
 
     int w = textWidth(GLUT_BITMAP_TIMES_ROMAN_24, title);
     int ws = textWidth(GLUT_BITMAP_HELVETICA_12, status);
@@ -132,16 +136,19 @@ static void drawStrip(int w)
 /* ------------------------------------------------------------------ */
 static void drawControls(int w)
 {
-    const char *l1 = "Arrows: orbit   +/-: zoom   Space: pause   Esc: quit";
-    const char *l2 = "N: next era   R: restart   T: transition   C: auto orbit   [ ]: speed";
+    const char *l1 = "Arrows: orbit   +/-: zoom   V: camera view   C: auto orbit   Space: pause   Esc: quit";
+    const char *l2 = "N: next era   R: restart   T: transition   [ ]: speed";
+    const char *l3 = "M: inspect model   , . : previous / next model";
     void *f = GLUT_BITMAP_HELVETICA_12;
 
-    text(w - 12.0f - textWidth(f, l1), 24.0f, f, l1, 0.95f, 0.95f, 0.95f);
-    text(w - 12.0f - textWidth(f, l2),  8.0f, f, l2, 0.95f, 0.95f, 0.95f);
+    text(w - 12.0f - textWidth(f, l1), 38.0f, f, l1, 0.95f, 0.95f, 0.95f);
+    text(w - 12.0f - textWidth(f, l2), 23.0f, f, l2, 0.95f, 0.95f, 0.95f);
+    text(w - 12.0f - textWidth(f, l3),  8.0f, f, l3, 0.95f, 0.95f, 0.95f);
 }
 
 /* ------------------------------------------------------------------ */
-void drawHUD(int winW, int winH, float speed, int paused, int autoOrbit)
+void drawHUD(int winW, int winH, float speed, int paused, int autoOrbit,
+             const char *viewName)
 {
     /* Save every switch we touch, so the 3D state is untouched after. */
     glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_COLOR_BUFFER_BIT | GL_LINE_BIT);
@@ -162,7 +169,7 @@ void drawHUD(int winW, int winH, float speed, int paused, int autoOrbit)
     glPushMatrix();
     glLoadIdentity();
 
-    drawTitle(winH, speed, paused, autoOrbit);
+    drawTitle(winH, speed, paused, autoOrbit, viewName);
     drawStrip(winW);
     drawControls(winW);
 

@@ -22,6 +22,12 @@ void timelineNext(void);           /* next transition now, or queued   */
 void timelineRestart(void);        /* back to the first era            */
 void timelineToggleEffect(void);   /* tunnel <-> scale swap            */
 
+/* Model inspection ('m'): the timeline stops on the current model while
+ * the car keeps driving; ',' and '.' step through the models. */
+void timelineSetInspect(int on);
+int  timelineInspecting(void);
+void timelineInspectStep(int dir);
+
 /* Queries for drawing the car and the HUD. */
 int         timelineModelIndex(void);   /* model to draw right now       */
 int         timelineTargetIndex(void);  /* model being travelled to      */

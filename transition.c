@@ -21,7 +21,9 @@
 /* ------------------------------------------------------------------ */
 /* Tunnel layout (units, roughly metres)                               */
 /* ------------------------------------------------------------------ */
-#define TUNNEL_LENGTH     9.0f   /* longer than the longest car (5.2)   */
+#define TUNNEL_MIN_LENGTH 9.0f   /* never shorter than this             */
+#define TUNNEL_MARGIN     3.0f   /* longer than the longest car by this */
+#define TUNNEL_LENGTH     tunnelLength()
 #define TUNNEL_LEAD      11.0f   /* entrance this far ahead of the car  */
 #define TUNNEL_INNER_HALF 1.70f  /* half the inside width               */
 #define TUNNEL_WALL       0.35f
@@ -38,6 +40,14 @@
 #define MAX_PARTICLES    48
 #define PARTICLE_LIFE    1.2f
 #define GRAVITY          6.0f
+
+/* The tunnel must hide the longest car completely at the swap, so its
+ * length follows the car models. */
+static float tunnelLength(void)
+{
+    float L = carMaxLength() + TUNNEL_MARGIN;
+    return L > TUNNEL_MIN_LENGTH ? L : TUNNEL_MIN_LENGTH;
+}
 
 typedef enum { PHASE_DRIVE, PHASE_TRANSITION } Phase;
 enum { FX_TUNNEL, FX_SCALE };
@@ -67,6 +77,7 @@ static float startX       = 0.0f;        /* car x when the transition began */
 static float swapX        = 0.0f;        /* tunnel: swap when the car gets here */
 
 static int   pendingNext  = 0;           /* 'n' pressed while busy: run it later */
+static int   inspecting   = 0;           /* 'm': timeline frozen on one model     */
 
 /* The background ripple, started at the moment of the model swap. */
 static RippleState ripple;
@@ -128,7 +139,7 @@ static void updateParticles(float dt)
  * finished, so two background changes never overlap. */
 static int canBegin(void)
 {
-    return phase == PHASE_DRIVE && !ripple.active;
+    return phase == PHASE_DRIVE && !ripple.active && !inspecting;
 }
 
 static void beginTransition(void)
@@ -214,6 +225,7 @@ void updateTimeline(float dt, float carX)
         if (tunnels[i].alive && tunnels[i].x + TUNNEL_LENGTH < carX - TUNNEL_FORGET)
             tunnels[i].alive = 0;
 
+    if (inspecting) return;      /* the car keeps driving, the era stays */
     phaseTime += dt;
 
     if (phase == PHASE_DRIVE) {
@@ -248,6 +260,7 @@ void timelineShiftWorld(float dx)
  * however often the key is pressed) and start as soon as allowed. */
 void timelineNext(void)
 {
+    if (inspecting) return;
     if (canBegin()) beginTransition();
     else            pendingNext = 1;
 }
@@ -260,9 +273,37 @@ void timelineRestart(void)
     target    = 0;
     swapped   = 0;
     pendingNext = 0;
+    inspecting  = 0;
     memset(&ripple,   0, sizeof ripple);       /* first era, no ripple */
     memset(tunnels,   0, sizeof tunnels);
     memset(particles, 0, sizeof particles);
+}
+
+/* Inspection mode. Entering it settles any running transition: a swap
+ * that has not happened yet is cancelled, so the car on screen stays. */
+void timelineSetInspect(int on)
+{
+    inspecting = on ? 1 : 0;
+    if (inspecting) {
+        phase       = PHASE_DRIVE;
+        target      = current;
+        swapped     = 0;
+        pendingNext = 0;
+    }
+    phaseTime = 0.0f;
+}
+
+int timelineInspecting(void) { return inspecting; }
+
+/* Step to the previous or next model instantly. The background follows
+ * at once too, so any running ripple is stopped. */
+void timelineInspectStep(int dir)
+{
+    if (!inspecting) return;
+    int n = carModelCount();
+    current = ((current + dir) % n + n) % n;
+    target  = current;
+    ripple.active = 0;
 }
 
 /* The new choice applies from the next transition, so a running

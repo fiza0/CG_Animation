@@ -35,6 +35,19 @@ static float camYaw      = 35.0f;   /* degrees around the y axis       */
 static float camPitch    = 18.0f;   /* degrees above the ground        */
 static float camDistance = 14.0f;   /* distance from the target        */
 
+/* Camera presets for inspecting the models ('v' cycles through them).
+ * Yaw 0 looks at the car's near side; positive yaw moves the camera
+ * towards the front of the car. The arrow keys still work afterwards. */
+typedef struct { const char *name; float yaw, pitch, dist; } CamPreset;
+static const CamPreset presets[] = {
+    { "side view",          0.0f,  6.0f,  9.0f },
+    { "front three-quarter", 55.0f, 14.0f, 9.0f },
+    { "rear three-quarter", -55.0f, 14.0f, 9.0f },
+    { "low front",          70.0f,  3.0f,  7.0f },
+    { "top-down",            0.0f, 85.0f, 11.0f },
+};
+static int presetIndex = -1;          /* -1: free camera */
+
 static void applyCamera(void)
 {
     float targetX = carX, targetY = 1.0f, targetZ = CAR_LANE_Z;
@@ -56,17 +69,33 @@ static void applyCamera(void)
 /* ------------------------------------------------------------------ */
 /* The car of the current era, at carX, scaled by the timeline         */
 /* ------------------------------------------------------------------ */
-static void drawCurrentCar(void)
+/* Push the car's transform. Returns 0 (and pushes nothing) when the
+ * car has shrunk away during a scale swap. */
+static int pushCarTransform(void)
 {
     float s = timelineCarScale();
-    if (s < 0.01f) return;   /* fully shrunk: nothing to draw */
+    if (s < 0.01f) return 0;   /* fully shrunk: nothing to draw */
 
     glPushMatrix();
-        glTranslatef(carX, 0.0f, CAR_LANE_Z);   /* move the whole car */
-        /* Scaling about the car's own origin, which sits on the road,
-         * makes it shrink down into its base rather than float away. */
-        glScalef(s, s, s);
-        drawCar(getCarModel(timelineModelIndex()), distance);
+    glTranslatef(carX, 0.0f, CAR_LANE_Z);   /* move the whole car */
+    /* Scaling about the car's own origin, which sits on the road,
+     * makes it shrink down into its base rather than float away. */
+    glScalef(s, s, s);
+    return 1;
+}
+
+static void drawCurrentCar(void)
+{
+    if (!pushCarTransform()) return;
+    drawCar(getCarModel(timelineModelIndex()), distance);
+    glPopMatrix();
+}
+
+/* The car's glass, with exactly the same transform as its body. */
+static void drawCurrentCarGlass(void)
+{
+    if (!pushCarTransform()) return;
+    drawCarGlass(getCarModel(timelineModelIndex()));
     glPopMatrix();
 }
 
@@ -139,10 +168,14 @@ static void display(void)
     drawBackdrop(carX, cur, prev, rip);  /* 3. distant skyline                 */
     drawScene(carX, cur, prev, rip);     /* 4. ground, road, roadside objects  */
     drawTunnels();                       /* 5. time tunnels, also in the world */
-    drawCurrentCar();                    /* 6. the car itself                  */
-    drawRippleRing(rip, cur->portal);    /* 7. see-through effects last        */
+    drawCurrentCar();                    /* 6. the car itself (opaque parts)   */
+    /* 7. See-through things last, once everything solid is in the depth
+     *    buffer: the car's glass, then the ripple ring and particles. */
+    drawCurrentCarGlass();
+    drawRippleRing(rip, cur->portal);
     drawParticles(carX);
-    drawHUD(winW, winH, carSpeed, paused, autoOrbit);  /* 8. overlay */
+    drawHUD(winW, winH, carSpeed, paused, autoOrbit,
+            presetIndex >= 0 ? presets[presetIndex].name : NULL);   /* 8. overlay */
 
     glutSwapBuffers();
 }
@@ -184,7 +217,20 @@ static void keyboard(unsigned char key, int x, int y)
         case '-': case '_': camDistance += 1.0f;     break;
         case ' ':           paused = !paused;        break;  /* pause / resume  */
         case 'n': case 'N': timelineNext();          break;  /* next era now    */
-        case 'r': case 'R': timelineRestart();       break;  /* first era again */
+        case 'r': case 'R': timelineRestart();
+                            sceneHideNearSide(0);    break;  /* first era again */
+        case 'm': case 'M':                                   /* inspect a model */
+            timelineSetInspect(!timelineInspecting());
+            sceneHideNearSide(timelineInspecting());
+            break;
+        case ',': case '<': timelineInspectStep(-1); break;  /* previous model  */
+        case '.': case '>': timelineInspectStep(+1); break;  /* next model      */
+        case 'v': case 'V':                                   /* camera preset   */
+            presetIndex = (presetIndex + 1) % (int)(sizeof presets / sizeof presets[0]);
+            camYaw      = presets[presetIndex].yaw;
+            camPitch    = presets[presetIndex].pitch;
+            camDistance = presets[presetIndex].dist;
+            break;
         case 't': case 'T': timelineToggleEffect();  break;  /* tunnel / scale  */
         case 'c': case 'C': autoOrbit = !autoOrbit;  break;  /* camera orbit    */
         case '[':           carSpeed -= SPEED_STEP;  break;

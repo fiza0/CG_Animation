@@ -62,6 +62,9 @@ void drawBackdrop(float followX, const struct EraTheme *cur,
 void drawScene(float followX, const struct EraTheme *cur,
                const struct EraTheme *prev, const struct RippleState *rip);
 
+/* Hide the near-side roadside objects (used while inspecting a car). */
+void sceneHideNearSide(int hide);
+
 /* The glowing wavefront. Call after all opaque geometry. */
 void drawRippleRing(const struct RippleState *rip, const float color[3]);
 
