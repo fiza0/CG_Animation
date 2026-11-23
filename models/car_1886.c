@@ -147,6 +147,11 @@ static void buildBody(const CarModel *m)
     seatAndBoards();
     engine();
     drivetrain();
+
+    /* Driver sits in the middle of the bench, behind the central tiller,
+     * both hands on the crank knob. A tiny "wheel radius" brings the
+     * hands together around the knob; feet rest on the footboard. */
+    driverFigure(v3(-0.32f, 0.95f, 0.0f), v3(0.32f, 1.30f, 0.0f), 0.06f, 0);
 }
 
 /* The flywheel turns with the engine, so it is drawn every frame. Its
