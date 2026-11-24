@@ -8,7 +8,6 @@
 #include "wheels.h"
 #include "models/models.h"
 
-/* One definition function per era, in timeline order. */
 typedef void (*DefineFn)(CarModel *m);
 
 static const DefineFn definers[] = {
@@ -21,11 +20,6 @@ static const DefineFn definers[] = {
 
 static CarModel models[MODEL_COUNT];
 
-/* ------------------------------------------------------------------ */
-/* Start-up: every car is modelled once and recorded into display      */
-/* lists, so a frame only replays them. The glass gets its own list    */
-/* because it is drawn later, in the transparent pass.                 */
-/* ------------------------------------------------------------------ */
 void initCars(void)
 {
     initGeom();
@@ -74,11 +68,6 @@ float carMaxLength(void)
 
 float carWheelRadius(const CarModel *m) { return m->wheel[1].radius; }
 
-/* Rolling without slipping: the tyre's arc length equals the distance
- * travelled, so angle (radians) = distance / radius. Each radius gets
- * its own angle, so small wheels spin faster than large ones. The
- * distance is a double so it stays precise during long runs; fmod
- * keeps the result between 0 and 360 degrees. */
 static float wheelAngle(double distance, float radius)
 {
     return (float)fmod(distance / radius * 180.0 / M_PI, 360.0);
@@ -88,7 +77,7 @@ static void placeWheel(const CarModel *m, int axle, float z, int farSide, double
 {
     float r = m->wheel[axle].radius;
     glPushMatrix();
-        glTranslatef(m->axleX[axle], r, z);   /* wheel touches y = 0 */
+        glTranslatef(m->axleX[axle], r, z);
         drawWheel(&m->wheelLists[axle], wheelAngle(distance, r), farSide);
     glPopMatrix();
 }
@@ -100,7 +89,7 @@ void drawCar(const CarModel *m, double distance)
     placeWheel(m, 1,  m->track[1], 0, distance);
     placeWheel(m, 1, -m->track[1], 1, distance);
     if (m->numWheels == 3) {
-        placeWheel(m, 0, 0.0f, 0, distance);    /* single front wheel */
+        placeWheel(m, 0, 0.0f, 0, distance);
     } else {
         placeWheel(m, 0,  m->track[0], 0, distance);
         placeWheel(m, 0, -m->track[0], 1, distance);
@@ -113,9 +102,6 @@ void drawCar(const CarModel *m, double distance)
     resetMaterial();
 }
 
-/* Glass is see-through, so it is drawn after everything solid. Blending
- * mixes it with what is already on screen; depth writes are off so the
- * glass never hides anything drawn after it. */
 void drawCarGlass(const CarModel *m)
 {
     if (!m->glassList) return;

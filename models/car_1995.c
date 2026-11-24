@@ -8,14 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 1995 E-Class (W210)                                                 */
-/*                                                                     */
-/* Rounded saloon with a continuous curved roof. The face has twin     */
-/* oval headlamps on each side ("four eyes"), the outer one larger, a  */
-/* slanted rounded grille in a body-colour bumper, rear lamps that     */
-/* wrap around the corners, oval door handles.                         */
-/* ------------------------------------------------------------------ */
 #define FX      1.415f
 #define RX     -1.415f
 #define WR      0.32f
@@ -49,7 +41,7 @@ static void lowerSection(float x, Section *s, const void *ctx)
     s->yBottom = yb < s->yTop - 0.06f ? yb : s->yTop - 0.06f;
     s->halfWidth = curveY(lowHw, COUNT(lowHw), x);
     s->topHalfWidth = 0.90f * s->halfWidth;
-    s->roundness = 3.6f;                          /* soft, rounded */
+    s->roundness = 3.6f;
 }
 
 static const Pt2 glTop[] = {
@@ -95,8 +87,6 @@ static void setup(ClosedCar *c)
     c->cabin = cab;
 }
 
-/* One oval lamp on a surface point: chrome reflector rim and a
- * glowing dome lens, wider than tall. */
 static void ovalLamp(Vec3 p, Vec3 n, float rx, float ry)
 {
     pushFrame(p, n);
@@ -113,14 +103,13 @@ static void frontEnd(void)
     for (int s = -1; s <= 1; s += 2) {
         Vec3 n, p;
         p = loftTop(&lower, 2.36f, s * 0.44f, &n);
-        ovalLamp(p, n, 0.088f, 0.064f);              /* inner, smaller */
+        ovalLamp(p, n, 0.088f, 0.064f);
         p = loftTop(&lower, 2.33f, s * 0.74f, &n);
-        ovalLamp(p, n, 0.100f, 0.074f);              /* outer, larger  */
+        ovalLamp(p, n, 0.100f, 0.074f);
         p = loftSide(&lower, 2.30f, 0.62f, (float)s, &n);
         lampRect(p, n, 0.10f, 0.04f, 0.015f, MAT_INDICATOR, MAT_PLASTIC);
     }
 
-    /* Slanted, rounded grille with a chrome surround. */
     Vec3 n, p = loftTop(&lower, 2.405f, 0.0f, &n);
     pushFrame(p, n);
         glTranslatef(0.0f, 0.0f, 0.004f);
@@ -133,7 +122,6 @@ static void frontEnd(void)
             tube(v3(i * 0.08f, -0.06f, 0.0f), v3(i * 0.08f, 0.06f, 0.0f), 0.008f, 0.008f, 6);
     glPopMatrix();
 
-    /* Body-colour bumper with a dark intake and a blank plate. */
     setMaterial(MAT_PAINT);
     roundedBox(2.38f, 0.40f, 0.0f, 0.14f, 0.18f, 1.70f, 5.0f);
     pushFrame(v3(2.452f, 0.36f, 0.0f), v3(1, 0, 0));
@@ -146,14 +134,13 @@ static void frontEnd(void)
 static void tail(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Main lens on the tail, a second piece round the corner. */
         lampRect(v3(TAIL_X, 0.60f, s * 0.52f), v3(-1, 0, 0), 0.36f, 0.14f, 0.03f, MAT_TAIL, MAT_PLASTIC);
         lampRect(v3(TAIL_X - 0.002f, 0.60f, s * 0.62f), v3(-1, 0, 0), 0.10f, 0.12f, 0.02f,
                  MAT_INDICATOR, MAT_INDICATOR);
         Vec3 n, p = loftSide(&lower, -2.33f, loftH(&lower, -2.33f, 0.60f), (float)s, &n);
         lampRect(p, n, 0.14f, 0.12f, 0.03f, MAT_TAIL, MAT_PLASTIC);
     }
-    numberPlate(v3(TAIL_X - 0.002f, 0.58f, 0.0f), v3(-1, 0, 0), 0.46f, 0.10f);   /* above the bumper */
+    numberPlate(v3(TAIL_X - 0.002f, 0.58f, 0.0f), v3(-1, 0, 0), 0.46f, 0.10f);
     setMaterial(MAT_PAINT);
     roundedBox(-2.33f, 0.42f, 0.0f, 0.12f, 0.18f, 1.68f, 5.0f);
     tailpipe(v3(-2.39f, 0.28f, 0.50f), 0.03f, 0.5f, MAT_CHROME);
@@ -162,12 +149,12 @@ static void tail(void)
 static void sides(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        setMaterial(MAT_CHROME);                                         /* thin side strip */
+        setMaterial(MAT_CHROME);
         Pt2 strip[2] = { { -2.10f, 0.50f }, { 2.20f, 0.50f } };
         loftStrip(&lower, strip, 2, 0, (float)s, 0.012f, 0.005f);
 
         const float hx[2] = { 0.28f, -0.75f };
-        for (int i = 0; i < 2; i++) {                                    /* oval handles */
+        for (int i = 0; i < 2; i++) {
             Vec3 n, p = loftSide(&lower, hx[i], 0.80f, (float)s, &n);
             pushFrame(p, n);
                 setMaterial(MAT_PAINT);
@@ -206,7 +193,7 @@ static void buildGlass(const CarModel *m)
 
 void defineCar1995(CarModel *m)
 {
-    static const float paint[3]   = { 0.50f, 0.58f, 0.53f };   /* silver-green */
+    static const float paint[3]   = { 0.50f, 0.58f, 0.53f };
     static const float accent[3]  = { 0.10f, 0.10f, 0.10f };
     static const float leather[3] = { 0.36f, 0.36f, 0.37f };
 

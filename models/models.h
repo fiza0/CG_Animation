@@ -3,7 +3,6 @@
 
 #include "../cars.h"
 
-/* Each file in models/ fills in one CarModel. */
 void defineCar1886(CarModel *m);
 void defineCar1901(CarModel *m);
 void defineCar1936(CarModel *m);

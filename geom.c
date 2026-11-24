@@ -25,9 +25,6 @@ static GLUquadric *quadric(void)
 
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
-/* ------------------------------------------------------------------ */
-/* Splines                                                             */
-/* ------------------------------------------------------------------ */
 float curveY(const Pt2 *p, int n, float x)
 {
     if (n <= 0) return 0.0f;
@@ -42,13 +39,9 @@ float curveY(const Pt2 *p, int n, float x)
     if (h < 1e-6f) return y1;
     float t = (x - x0) / h;
 
-    /* Slope at each end of the segment from its two neighbours
-     * (one-sided at the very ends). Matching slopes on both sides of
-     * every control point is what makes the curve smooth. */
     float m0 = (i > 0)     ? (y1 - p[i - 1].y) / (x1 - p[i - 1].x) : (y1 - y0) / h;
     float m1 = (i + 2 < n) ? (p[i + 2].y - y0) / (p[i + 2].x - x0) : (y1 - y0) / h;
 
-    /* Cubic Hermite blend of the two end values and slopes. */
     float t2 = t * t, t3 = t2 * t;
     return (2*t3 - 3*t2 + 1) * y0 + (t3 - 2*t2 + t) * h * m0
          + (-2*t3 + 3*t2)    * y1 + (t3 - t2)       * h * m1;
@@ -63,8 +56,6 @@ Vec3 pathPoint(const Vec3 *p, int n, float t)
     if (i > n - 2) i = n - 2;
     float u = f - i, u2 = u * u, u3 = u2 * u;
 
-    /* Catmull-Rom: the curve passes through every point, and the end
-     * points are repeated so the curve starts and ends on them. */
     Vec3 p0 = p[i > 0 ? i - 1 : 0], p1 = p[i], p2 = p[i + 1];
     Vec3 p3 = p[i + 2 < n ? i + 2 : n - 1];
 #define CR(c) (0.5f * (2.0f * p1.c + (-p0.c + p2.c) * u \
@@ -75,15 +66,6 @@ Vec3 pathPoint(const Vec3 *p, int n, float t)
     return r;
 }
 
-/* ------------------------------------------------------------------ */
-/* Grids: the shared machinery behind lofts and sweeps                 */
-/*                                                                     */
-/* A grid is rows of rings. Each vertex normal comes from two          */
-/* tangents (to the neighbouring ring and to the neighbouring point on */
-/* its own ring); their cross product is perpendicular to the surface. */
-/* It is flipped if it points towards the ring's centre, so it always  */
-/* points outwards. Shared vertices get one normal: smooth shading.    */
-/* ------------------------------------------------------------------ */
 static Vec3 gP[MAX_ROWS * MAX_COLS], gN[MAX_ROWS * MAX_COLS], gC[MAX_ROWS];
 
 static void gridNormals(int rows, int cols)
@@ -96,7 +78,7 @@ static void gridNormals(int rows, int cols)
             Vec3 around = vSub(gP[r * cols + cp], gP[r * cols + cm]);
             Vec3 out    = vSub(gP[r * cols + c], gC[r]);
             Vec3 n      = vCross(along, around);
-            if (vLen(n) < 1e-10f)            /* collapsed ring at an end */
+            if (vLen(n) < 1e-10f)
                 n = (r == 0) ? vScale(along, -1.0f) : (r == rows - 1 ? along : out);
             if (vDot(n, out) < 0.0f) n = vScale(n, -1.0f);
             gN[r * cols + c] = vNorm(n);
@@ -131,7 +113,6 @@ static void drawGrid(int rows, int cols, QuadFilter filter, const void *ctx)
     glEnd();
 }
 
-/* Close the end of a grid with a fan from the ring's centre. */
 static void capFan(int row, int cols, Vec3 normal)
 {
     glNormal3f(normal.x, normal.y, normal.z);
@@ -144,12 +125,6 @@ static void capFan(int row, int cols, Vec3 normal)
     glEnd();
 }
 
-/* ------------------------------------------------------------------ */
-/* Lofts                                                               */
-/* ------------------------------------------------------------------ */
-
-/* Signed power keeps the sign: used to bend a circle into a
- * superellipse (|u|^n + |v|^n = 1). */
 static float spow(float v, float e) { return v >= 0.0f ? powf(v, e) : -powf(-v, e); }
 
 static void evalSection(const Loft *L, float x, Section *s)
@@ -161,8 +136,6 @@ static void evalSection(const Loft *L, float x, Section *s)
     if (s->topHalfWidth < 0.005f)     s->topHalfWidth = 0.005f;
 }
 
-/* (u, v) on the unit superellipse -> point in the section at x. The
- * half-width blends from the bottom value to the top value with height. */
 static Vec3 sectionPoint(const Section *s, float x, float u, float v)
 {
     float yc = 0.5f * (s->yBottom + s->yTop), a = 0.5f * (s->yTop - s->yBottom);
@@ -182,8 +155,6 @@ void drawLoft(const Loft *L)
         float e = 2.0f / s.roundness;
         gC[r] = v3(x, 0.5f * (s.yBottom + s.yTop), 0.0f);
         for (int c = 0; c < cols; c++) {
-            /* Walking round a circle and raising cos and sin to 2/n
-             * flattens the sides and squares off the corners. */
             float th = 2.0f * (float)M_PI * c / cols;
             gP[r * cols + c] = sectionPoint(&s, x, spow(cosf(th), e), spow(sinf(th), e));
         }
@@ -195,8 +166,6 @@ void drawLoft(const Loft *L)
     if (L->capFront) capFan(rows - 1, cols, v3( 1.0f, 0.0f, 0.0f));
 }
 
-/* Point on the surface. Side mode: a = h (0 bottom .. 1 top, height
- * linear). Top mode: a = u (-1 .. 1 across the width). */
 static Vec3 surfacePoint(const Loft *L, float x, float a, int top, float side)
 {
     Section s;
@@ -212,8 +181,6 @@ static Vec3 surfacePoint(const Loft *L, float x, float a, int top, float side)
     return sectionPoint(&s, x, u, v);
 }
 
-/* Normal from two tangents measured by small steps along x and along
- * the surface parameter. */
 static Vec3 surfaceNormal(const Loft *L, float x, float a, int top, float side)
 {
     const float dx = 0.01f, da = 0.01f;
@@ -274,9 +241,6 @@ void loftStrip(const Loft *L, const Pt2 *pts, int n, int topMode,
         float x = pts[seg].x + dxs * f, a = pts[seg].y + das * f;
 
         Vec3 nrm, p = surfAt(L, x, a, topMode, side, &nrm);
-        /* Direction of travel on the surface: a small step along the
-         * segment. The band's width is perpendicular to it and to the
-         * surface normal. */
         Vec3 q = surfAt(L, x + dxs * 0.02f, a + das * 0.02f, topMode, side, NULL);
         Vec3 T = vSub(q, p);
         if (vLen(T) < 1e-7f) T = v3(1.0f, 0.0f, 0.0f);
@@ -331,9 +295,6 @@ float archBottom(float x, float axleX, float archR, float axleY, float base)
     return y > base ? y : base;
 }
 
-/* ------------------------------------------------------------------ */
-/* Sweeps and tubes                                                    */
-/* ------------------------------------------------------------------ */
 void sweep(const Vec3 *path, int n, int samples,
            const Pt2 *sec, int nSec, Vec3 across, int caps)
 {
@@ -346,9 +307,6 @@ void sweep(const Vec3 *path, int n, int samples,
         Vec3  C  = pathPoint(path, n, t);
         Vec3  T  = vNorm(vSub(pathPoint(path, n, clampf(t + 0.01f, 0, 1)),
                               pathPoint(path, n, clampf(t - 0.01f, 0, 1))));
-        /* A frame that travels with the path: B is the requested
-         * "across" direction made perpendicular to the tangent, and N
-         * completes the set. */
         Vec3 B = vSub(across, vScale(T, vDot(across, T)));
         if (vLen(B) < 1e-4f)
             B = fabsf(T.y) < 0.9f ? vCross(T, v3(0, 1, 0)) : vCross(T, v3(1, 0, 0));
@@ -385,8 +343,6 @@ void sweepTube(const Vec3 *path, int n, int samples, float radius, int sides)
     sweep(path, n, samples, sec, sides, across, 1);
 }
 
-/* GLU cylinders run along +z. Rotate +z onto the direction a -> b:
- * the rotation axis is z x d and the angle is the angle between them. */
 static int alignToSegment(Vec3 a, Vec3 b, float *len)
 {
     Vec3 d = vSub(b, a);
@@ -419,7 +375,7 @@ void tubeCapped(Vec3 a, Vec3 b, float r0, float r1, int sides)
     if (alignToSegment(a, b, &len)) {
         GLUquadric *q = quadric();
         gluCylinder(q, r0, r1, len, sides, 1);
-        gluQuadricOrientation(q, GLU_INSIDE);      /* start cap faces -z */
+        gluQuadricOrientation(q, GLU_INSIDE);
         gluDisk(q, 0.0, r0, sides, 1);
         gluQuadricOrientation(q, GLU_OUTSIDE);
         glTranslatef(0.0f, 0.0f, len);
@@ -428,9 +384,6 @@ void tubeCapped(Vec3 a, Vec3 b, float r0, float r1, int sides)
     glPopMatrix();
 }
 
-/* ------------------------------------------------------------------ */
-/* Revolve                                                             */
-/* ------------------------------------------------------------------ */
 void revolve(const Pt2 *rz, int n, int segs)
 {
     float nr[MAX_PROFILE], nz[MAX_PROFILE];
@@ -438,9 +391,6 @@ void revolve(const Pt2 *rz, int n, int segs)
     if (n > MAX_PROFILE) n = MAX_PROFILE;
     if (segs < 3) segs = 3;
 
-    /* Profile normal at each point: the average of the normals of the
-     * segments on either side, each (dz, -dr). A zero-length segment
-     * (a repeated point) is skipped, which leaves a sharp crease. */
     for (int i = 0; i < n; i++) {
         float sr = 0.0f, sz = 0.0f;
         for (int k = -1; k <= 0; k++) {
@@ -473,9 +423,6 @@ void revolve(const Pt2 *rz, int n, int segs)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* Boxes and flat shapes                                               */
-/* ------------------------------------------------------------------ */
 typedef struct { float y0, y1, hw, n; } BoxCtx;
 
 static void boxSection(float x, Section *s, const void *ctx)
@@ -556,7 +503,6 @@ void pushFrame(Vec3 p, Vec3 n)
 {
     Vec3 X, Y, Z;
     frameAxes(n, &X, &Y, &Z);
-    /* OpenGL matrices are column-major: each column is a local axis. */
     GLfloat m[16] = { X.x, X.y, X.z, 0.0f,
                       Y.x, Y.y, Y.z, 0.0f,
                       Z.x, Z.y, Z.z, 0.0f,

@@ -9,35 +9,24 @@
 #include "eras.h"
 #include "props.h"
 
-/* ------------------------------------------------------------------ */
-/* Car motion state                                                    */
-/* ------------------------------------------------------------------ */
-#define MIN_SPEED        4.0f   /* units per second (about 14 km/h)   */
-#define MAX_SPEED       30.0f   /* about 108 km/h                     */
+#define MIN_SPEED        4.0f
+#define MAX_SPEED       30.0f
 #define SPEED_STEP       2.0f
-#define AUTO_ORBIT_RATE  8.0f   /* degrees per second for the 'c' key */
-#define WRAP_DISTANCE  (20.0f * SCENE_PERIOD)   /* 1920 m, a whole number of periods */
+#define AUTO_ORBIT_RATE  8.0f
+#define WRAP_DISTANCE  (20.0f * SCENE_PERIOD)
 
-static float  carX      = 0.0f;   /* position along the road            */
-static float  carSpeed  = 12.0f;  /* units per second (about 43 km/h)   */
-static double distance  = 0.0;    /* total distance driven, for wheels  */
+static float  carX      = 0.0f;
+static float  carSpeed  = 12.0f;
+static double distance  = 0.0;
 static int    paused    = 0;
 static int    autoOrbit = 0;
-static int    lastTime  = 0;      /* ms, from glutGet(GLUT_ELAPSED_TIME) */
+static int    lastTime  = 0;
 static int    winW = 1024, winH = 640;
 
-/* ------------------------------------------------------------------ */
-/* Orbit camera                                                        */
-/* The camera sits on a sphere around a target point and always looks */
-/* at it. The target follows the car, so the camera follows too.      */
-/* ------------------------------------------------------------------ */
-static float camYaw      = 35.0f;   /* degrees around the y axis       */
-static float camPitch    = 18.0f;   /* degrees above the ground        */
-static float camDistance = 14.0f;   /* distance from the target        */
+static float camYaw      = 35.0f;
+static float camPitch    = 18.0f;
+static float camDistance = 14.0f;
 
-/* Camera presets for inspecting the models ('v' cycles through them).
- * Yaw 0 looks at the car's near side; positive yaw moves the camera
- * towards the front of the car. The arrow keys still work afterwards. */
 typedef struct { const char *name; float yaw, pitch, dist; } CamPreset;
 static const CamPreset presets[] = {
     { "side view",          0.0f,  6.0f,  9.0f },
@@ -46,14 +35,12 @@ static const CamPreset presets[] = {
     { "low front",          70.0f,  3.0f,  7.0f },
     { "top-down",            0.0f, 85.0f, 11.0f },
 };
-static int presetIndex = -1;          /* -1: free camera */
+static int presetIndex = -1;
 
 static void applyCamera(void)
 {
     float targetX = carX, targetY = 1.0f, targetZ = CAR_LANE_Z;
 
-    /* Spherical to Cartesian: convert (yaw, pitch, distance) into an
-     * (x, y, z) camera position relative to the target. */
     float yaw   = camYaw   * (float)M_PI / 180.0f;
     float pitch = camPitch * (float)M_PI / 180.0f;
 
@@ -61,25 +48,18 @@ static void applyCamera(void)
     float camY = targetY + camDistance * sinf(pitch);
     float camZ = targetZ + camDistance * cosf(pitch) * cosf(yaw);
 
-    gluLookAt(camX, camY, camZ,          /* eye position      */
-              targetX, targetY, targetZ, /* point looked at   */
-              0.0f, 1.0f, 0.0f);         /* "up" direction    */
+    gluLookAt(camX, camY, camZ,
+              targetX, targetY, targetZ,
+              0.0f, 1.0f, 0.0f);
 }
 
-/* ------------------------------------------------------------------ */
-/* The car of the current era, at carX, scaled by the timeline         */
-/* ------------------------------------------------------------------ */
-/* Push the car's transform. Returns 0 (and pushes nothing) when the
- * car has shrunk away during a scale swap. */
 static int pushCarTransform(void)
 {
     float s = timelineCarScale();
-    if (s < 0.01f) return 0;   /* fully shrunk: nothing to draw */
+    if (s < 0.01f) return 0;
 
     glPushMatrix();
-    glTranslatef(carX, 0.0f, CAR_LANE_Z);   /* move the whole car */
-    /* Scaling about the car's own origin, which sits on the road,
-     * makes it shrink down into its base rather than float away. */
+    glTranslatef(carX, 0.0f, CAR_LANE_Z);
     glScalef(s, s, s);
     return 1;
 }
@@ -91,7 +71,6 @@ static void drawCurrentCar(void)
     glPopMatrix();
 }
 
-/* The car's glass, with exactly the same transform as its body. */
 static void drawCurrentCarGlass(void)
 {
     if (!pushCarTransform()) return;
@@ -99,31 +78,21 @@ static void drawCurrentCarGlass(void)
     glPopMatrix();
 }
 
-/* ------------------------------------------------------------------ */
-/* Animation update                                                    */
-/* ------------------------------------------------------------------ */
 static void update(float dt)
 {
-    float step = carSpeed * dt;       /* distance = speed x time */
+    float step = carSpeed * dt;
     carX     += step;
     distance += step;
 
-    /* Floats lose precision as numbers grow, so after a long run the
-     * car would start to jitter. Pulling carX back by a multiple of
-     * SCENE_PERIOD is invisible, because the scene repeats exactly.
-     * Tunnels live in world coordinates, so they move back too. */
     if (carX > WRAP_DISTANCE) {
         carX -= WRAP_DISTANCE;
         timelineShiftWorld(-WRAP_DISTANCE);
     }
 
     updateTimeline(dt, carX);
-    updateProps(dt);     /* turbine rotors */
+    updateProps(dt);
 }
 
-/* Called about 60 times per second. Delta time (dt) is the real time
- * since the previous call, so the car covers the same distance per
- * second whether the machine draws 30 or 120 frames per second. */
 static void timer(int value)
 {
     (void)value;
@@ -131,25 +100,17 @@ static void timer(int value)
     float dt = (now - lastTime) / 1000.0f;
     lastTime = now;
 
-    if (dt > 0.1f) dt = 0.1f;   /* avoid a big jump after a stall */
+    if (dt > 0.1f) dt = 0.1f;
     if (!paused) update(dt);
 
-    /* The automatic orbit keeps turning while paused, which is handy
-     * for looking at a frozen car from every side. */
     if (autoOrbit) camYaw = fmodf(camYaw + AUTO_ORBIT_RATE * dt, 360.0f);
 
     glutPostRedisplay();
     glutTimerFunc(16, timer, 0);
 }
 
-/* ------------------------------------------------------------------ */
-/* GLUT callbacks                                                      */
-/* ------------------------------------------------------------------ */
 static void display(void)
 {
-    /* The era theme follows the car model. While a ripple runs, the
-     * previous era is still visible further out, and the global look
-     * (sky, fog, light) blends from the old theme to the new one. */
     const EraTheme    *cur  = getEraTheme(timelineModelIndex());
     const RippleState *rip  = timelineRipple();
     const EraTheme    *prev = rip->active ? getEraTheme(rip->fromEra) : NULL;
@@ -158,24 +119,22 @@ static void display(void)
     if (prev) blendThemeGlobals(&look, prev, cur, rippleGlobalFactor(rip));
     else      look = *cur;
 
-    applyThemeGlobals(&look);   /* sky and fog colour, before clearing */
+    applyThemeGlobals(&look);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    applyCamera();                       /* 1. position the camera             */
-    setupLighting(&look);                /* 2. sun in world coordinates        */
-    drawBackdrop(carX, cur, prev, rip);  /* 3. distant skyline                 */
-    drawScene(carX, cur, prev, rip);     /* 4. ground, road, roadside objects  */
-    drawTunnels();                       /* 5. time tunnels, also in the world */
-    drawCurrentCar();                    /* 6. the car itself (opaque parts)   */
-    /* 7. See-through things last, once everything solid is in the depth
-     *    buffer: the car's glass, then the ripple ring and particles. */
+    applyCamera();
+    setupLighting(&look);
+    drawBackdrop(carX, cur, prev, rip);
+    drawScene(carX, cur, prev, rip);
+    drawTunnels();
+    drawCurrentCar();
     drawCurrentCarGlass();
     drawRippleRing(rip, cur->portal);
     drawParticles(carX);
     drawHUD(winW, winH, carSpeed, paused, autoOrbit,
-            presetIndex >= 0 ? presets[presetIndex].name : NULL);   /* 8. overlay */
+            presetIndex >= 0 ? presets[presetIndex].name : NULL);
 
     glutSwapBuffers();
 }
@@ -183,14 +142,12 @@ static void display(void)
 static void reshape(int w, int h)
 {
     if (h == 0) h = 1;
-    winW = w;            /* the HUD needs the window size in pixels */
+    winW = w;
     winH = h;
     glViewport(0, 0, w, h);
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    /* 50 degree vertical field of view; near and far clipping planes at
-     * 0.1 and 500 units. Anything outside that range is not drawn. */
     gluPerspective(50.0, (double)w / h, 0.1, 500.0);
     glMatrixMode(GL_MODELVIEW);
 }
@@ -204,7 +161,6 @@ static void specialKeys(int key, int x, int y)
         case GLUT_KEY_UP:    camPitch += 2.0f; break;
         case GLUT_KEY_DOWN:  camPitch -= 2.0f; break;
     }
-    /* Keep the camera above the ground and below straight overhead. */
     if (camPitch < 3.0f)  camPitch = 3.0f;
     if (camPitch > 85.0f) camPitch = 85.0f;
 }
@@ -215,27 +171,27 @@ static void keyboard(unsigned char key, int x, int y)
     switch (key) {
         case '+': case '=': camDistance -= 1.0f;     break;
         case '-': case '_': camDistance += 1.0f;     break;
-        case ' ':           paused = !paused;        break;  /* pause / resume  */
-        case 'n': case 'N': timelineNext();          break;  /* next era now    */
+        case ' ':           paused = !paused;        break;
+        case 'n': case 'N': timelineNext();          break;
         case 'r': case 'R': timelineRestart();
-                            sceneHideNearSide(0);    break;  /* first era again */
-        case 'm': case 'M':                                   /* inspect a model */
+                            sceneHideNearSide(0);    break;
+        case 'm': case 'M':
             timelineSetInspect(!timelineInspecting());
             sceneHideNearSide(timelineInspecting());
             break;
-        case ',': case '<': timelineInspectStep(-1); break;  /* previous model  */
-        case '.': case '>': timelineInspectStep(+1); break;  /* next model      */
-        case 'v': case 'V':                                   /* camera preset   */
+        case ',': case '<': timelineInspectStep(-1); break;
+        case '.': case '>': timelineInspectStep(+1); break;
+        case 'v': case 'V':
             presetIndex = (presetIndex + 1) % (int)(sizeof presets / sizeof presets[0]);
             camYaw      = presets[presetIndex].yaw;
             camPitch    = presets[presetIndex].pitch;
             camDistance = presets[presetIndex].dist;
             break;
-        case 't': case 'T': timelineToggleEffect();  break;  /* tunnel / scale  */
-        case 'c': case 'C': autoOrbit = !autoOrbit;  break;  /* camera orbit    */
+        case 't': case 'T': timelineToggleEffect();  break;
+        case 'c': case 'C': autoOrbit = !autoOrbit;  break;
         case '[':           carSpeed -= SPEED_STEP;  break;
         case ']':           carSpeed += SPEED_STEP;  break;
-        case 27:            exit(0);                          /* Esc quits       */
+        case 27:            exit(0);
     }
     if (camDistance < 5.0f)  camDistance = 5.0f;
     if (camDistance > 60.0f) camDistance = 60.0f;
@@ -243,7 +199,6 @@ static void keyboard(unsigned char key, int x, int y)
     if (carSpeed > MAX_SPEED) carSpeed = MAX_SPEED;
 }
 
-/* ------------------------------------------------------------------ */
 int main(int argc, char **argv)
 {
     glutInit(&argc, argv);
@@ -252,7 +207,7 @@ int main(int argc, char **argv)
     glutCreateWindow("Mercedes-Benz: Evolution by Decade");
 
     initScene();
-    initCars();       /* tessellate every body into a display list */
+    initCars();
     initTimeline();
 
     glutDisplayFunc(display);

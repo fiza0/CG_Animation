@@ -5,13 +5,12 @@
 #include "materials.h"
 
 typedef struct {
-    float color[4];     /* diffuse and ambient (via glColor), with alpha */
-    float specular;     /* grey level of the highlight                   */
-    float shininess;    /* 0..128: higher = smaller, sharper highlight   */
-    float emission[3];  /* light given off by the surface itself         */
+    float color[4];
+    float specular;
+    float shininess;
+    float emission[3];
 } MaterialDef;
 
-/* Colours for PAINT, ACCENT and LEATHER are filled in per car. */
 static MaterialDef table[MAT_COUNT] = {
     [MAT_PAINT]       = { {0.7f, 0.7f, 0.7f, 1.0f},    0.60f,  64.0f, {0, 0, 0} },
     [MAT_ACCENT]      = { {0.1f, 0.1f, 0.1f, 1.0f},    0.60f,  64.0f, {0, 0, 0} },

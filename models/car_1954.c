@@ -8,14 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 1954 300 SL "Gullwing"                                              */
-/*                                                                     */
-/* Very low, smooth coupe: long bonnet with two power domes, a wide    */
-/* low grille with one thick chrome bar, round headlamps faired into   */
-/* the wings, eyebrows over the wheel arches, gill vents behind the    */
-/* front wheels, gullwing door seams running into the roof.            */
-/* ------------------------------------------------------------------ */
 #define FX     1.20f
 #define RX    -1.20f
 #define WR     0.35f
@@ -34,7 +26,6 @@ static const Pt2 lowBot[] = {
     { -2.20f, 0.34f }, { -1.95f, 0.29f }, { -1.50f, SILL }, { 1.50f, SILL },
     {  1.95f, 0.29f }, {  2.20f, 0.31f },
 };
-/* Slightly wider over the wheels: the start of the eyebrows. */
 static const Pt2 lowHw[] = {
     { -2.20f, 0.62f }, { -2.00f, 0.80f }, { -1.60f, 0.87f }, { -1.20f, HW },
     { -0.60f, 0.87f }, {  0.60f, 0.87f }, {  1.20f, HW },    {  1.75f, 0.84f },
@@ -56,7 +47,6 @@ static void lowerSection(float x, Section *s, const void *ctx)
     s->roundness = 3.2f;
 }
 
-/* Small, rounded glasshouse: steep fastback rear, thin pillars. */
 static const Pt2 glTop[] = {
     { -1.45f, 0.86f }, { -1.25f, 1.02f }, { -1.00f, 1.16f }, { -0.60f, 1.27f },
     { -0.10f, 1.30f }, {  0.20f, 1.27f }, {  0.40f, 1.10f }, {  0.55f, 0.90f },
@@ -91,7 +81,7 @@ static void setup(ClosedCar *c)
     c->sill = SILL;
     c->wellDepth = HW - (TRACK - 0.5f * WW - 0.06f);
     c->doorX[0] = 0.50f; c->doorX[1] = -0.62f; c->nDoorX = 2;
-    c->doorTopH = 0.93f; c->doorBottomH = 0.30f;     /* high sills */
+    c->doorTopH = 0.93f; c->doorBottomH = 0.30f;
     c->roofMat = MAT_PAINT;
     c->beltMat = MAT_CHROME;
     c->roofTrimMat = MAT_RUBBER;
@@ -100,8 +90,6 @@ static void setup(ClosedCar *c)
     c->cabin = cab;
 }
 
-/* Two long bulges on the bonnet, swept along its surface. The ends dip
- * into the bonnet so the bulges rise out of it smoothly. */
 static void powerDomes(void)
 {
     Pt2 sec[16];
@@ -125,7 +113,6 @@ static void powerDomes(void)
 
 static void frontEnd(void)
 {
-    /* Wide, low oval grille with one thick horizontal chrome bar. */
     pushFrame(v3(2.202f, 0.45f, 0.0f), v3(1, 0, 0));
         setMaterial(MAT_MATTE);
         ellipseDisc(0.40f, 0.10f, 32);
@@ -140,7 +127,6 @@ static void frontEnd(void)
     glPopMatrix();
 
     for (int s = -1; s <= 1; s += 2) {
-        /* Round headlamps faired into the wings, turned mostly forward. */
         Vec3 n, p = loftSide(&lower, 2.08f, 0.80f, (float)s, &n);
         Vec3 aim = vNorm(vAdd(n, v3(1.2f, 0.0f, 0.0f)));
         headlampRound(vAdd(p, vScale(n, 0.01f)), aim, 0.085f, 0.10f, MAT_PAINT, MAT_CHROME);
@@ -149,7 +135,6 @@ static void frontEnd(void)
         lampRect(p, n, 0.06f, 0.03f, 0.012f, MAT_INDICATOR, MAT_CHROME);
     }
 
-    /* Slim chrome bumpers with overriders, front and rear. */
     setMaterial(MAT_CHROME);
     Vec3 fb[5] = { v3(1.98f, 0.36f, -0.80f), v3(2.16f, 0.36f, -0.60f), v3(2.25f, 0.36f, 0.0f),
                    v3(2.16f, 0.36f, 0.60f),  v3(1.98f, 0.36f, 0.80f) };
@@ -166,7 +151,6 @@ static void frontEnd(void)
     numberPlate(v3(-2.202f, 0.48f, 0.0f), v3(-1, 0, 0), 0.36f, 0.11f);
 }
 
-/* Eyebrows: a rounded lip following the top of every wheel arch. */
 static void eyebrows(void)
 {
     setMaterial(MAT_PAINT);
@@ -189,7 +173,6 @@ static void eyebrows(void)
 static void sides(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Gill vents behind the front wheels: dark slot, chrome bars. */
         Vec3 n, p = loftSide(&lower, 0.66f, 0.62f, (float)s, &n);
         pushFrame(p, n);
             setMaterial(MAT_MATTE);
@@ -206,17 +189,14 @@ static void sides(void)
         p = loftSide(&lower, 0.40f, 0.95f, (float)s, NULL);
         sideMirror(p, (float)s, MAT_CHROME, 0);
 
-        /* Small vertical tail lamps. */
         p = loftSide(&lower, -2.15f, 0.62f, (float)s, &n);
         lampRect(p, n, 0.05f, 0.13f, 0.02f, MAT_TAIL, MAT_CHROME);
 
-        /* Gullwing door seam over the roof, and down the glasshouse. */
         setMaterial(MAT_MATTE);
         Pt2 seam[2] = { { -0.52f, s * 0.30f }, { 0.15f, s * 0.30f } };
         loftStrip(&glass, seam, 2, 1, 1.0f, 0.005f, 0.002f);
     }
 
-    /* Wipers parked at the base of the windscreen. */
     for (int i = 0; i < 2; i++) {
         float u0 = i ? 0.05f : -0.55f;
         Vec3 n, p = loftTop(&glass, 0.49f, u0, &n);
@@ -249,9 +229,9 @@ static void buildGlass(const CarModel *m)
 
 void defineCar1954(CarModel *m)
 {
-    static const float paint[3]   = { 0.72f, 0.73f, 0.75f };   /* silver       */
+    static const float paint[3]   = { 0.72f, 0.73f, 0.75f };
     static const float accent[3]  = { 0.10f, 0.10f, 0.10f };
-    static const float leather[3] = { 0.55f, 0.08f, 0.08f };   /* red interior */
+    static const float leather[3] = { 0.55f, 0.08f, 0.08f };
 
     m->year = "1954";
     m->name = "300 SL Gullwing";

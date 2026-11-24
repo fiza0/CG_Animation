@@ -8,14 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 1982 190E (W201)                                                    */
-/*                                                                     */
-/* Compact wedge: low nose, belt line rising to a high, short boot     */
-/* with a kicked-up edge. Narrow headlamps, a small grille, grey       */
-/* plastic cladding along the lower sides, body-colour bumpers with    */
-/* grey covers, smaller ribbed tail lamps and a single big wiper.      */
-/* ------------------------------------------------------------------ */
 #define FX      1.33f
 #define RX     -1.33f
 #define WR      0.31f
@@ -96,13 +88,11 @@ static void setup(ClosedCar *c)
 static void frontEnd(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Narrow rectangular headlamps, indicator wrapping the corner. */
         lampRect(v3(NOSE_X, 0.54f, s * 0.55f), v3(1, 0, 0), 0.34f, 0.12f, 0.01f, MAT_LAMP, MAT_PLASTIC);
         Vec3 n, p = loftSide(&lower, 2.10f, 0.66f, (float)s, &n);
         lampRect(p, n, 0.08f, 0.10f, 0.01f, MAT_INDICATOR, MAT_PLASTIC);
     }
 
-    /* A smaller, narrower grille than the W123's. */
     setMaterial(MAT_CHROME);
     roundedBox(2.165f, 0.55f, 0.0f, 0.04f, 0.16f, 0.28f, 8.0f);
     pushFrame(v3(2.187f, 0.55f, 0.0f), v3(1, 0, 0));
@@ -113,7 +103,6 @@ static void frontEnd(void)
             tube(v3(i * 0.03f, -0.05f, 0.005f), v3(i * 0.03f, 0.05f, 0.005f), 0.005f, 0.005f, 6);
     glPopMatrix();
 
-    /* Body-colour bumper with a grey plastic cover band. */
     setMaterial(MAT_PAINT);
     roundedBox(2.17f, 0.38f, 0.0f, 0.10f, 0.16f, 1.72f, 6.0f);
     setMaterial(MAT_GREY_TRIM);
@@ -143,8 +132,6 @@ static void tail(void)
     tailpipe(v3(-2.20f, 0.27f, 0.45f), 0.028f, 0.5f, MAT_CHROME);
 }
 
-/* Grey plastic cladding on the lower doors and sills, the defining
- * 1980s detail. Laid on the body surface, skipping the wheel arches. */
 static void cladding(void)
 {
     const float xs[3][2] = {
@@ -170,12 +157,10 @@ static void sides(void)
         sideMirror(p, (float)s, MAT_PLASTIC, 0);
     }
 
-    /* Monowiper: one long blade parked along the bottom of the screen. */
     Vec3 n, p = loftTop(&glass, 0.75f, 0.05f, &n);
     Vec3 t = loftTop(&glass, 0.73f, -0.85f, NULL);
     wiper(p, t, n);
 
-    /* Kicked-up boot edge picked out with a thin dark line. */
     setMaterial(MAT_PLASTIC);
     Pt2 lip[2] = { { -2.08f, -0.85f }, { -2.08f, 0.85f } };
     loftStrip(&lower, lip, 2, 1, 1.0f, 0.008f, 0.003f);
@@ -203,9 +188,9 @@ static void buildGlass(const CarModel *m)
 
 void defineCar1982(CarModel *m)
 {
-    static const float paint[3]   = { 0.10f, 0.14f, 0.30f };   /* dark blue    */
+    static const float paint[3]   = { 0.10f, 0.14f, 0.30f };
     static const float accent[3]  = { 0.42f, 0.43f, 0.45f };
-    static const float leather[3] = { 0.24f, 0.26f, 0.32f };   /* blue-grey cloth */
+    static const float leather[3] = { 0.24f, 0.26f, 0.32f };
 
     m->year = "1982";
     m->name = "190E (W201)";

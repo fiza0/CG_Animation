@@ -8,15 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 2013 S-Class (W222)                                                 */
-/*                                                                     */
-/* Long luxury saloon: long wheelbase and roofline, short boot, a      */
-/* large upright chrome grille, slim headlamps with three LED strips,  */
-/* a sculpted shoulder crease and a dropping lower line along the      */
-/* doors, chrome around the windows and low on the doors, wide LED     */
-/* tail lamps.                                                         */
-/* ------------------------------------------------------------------ */
 #define FX      1.5175f
 #define RX     -1.5175f
 #define WR      0.35f
@@ -96,7 +87,6 @@ static void setup(ClosedCar *c)
     c->cabin = cab;
 }
 
-/* Strips drawn with lighting off look like light sources. */
 static void glowQuad(float x0, float y0, float x1, float y1, float r, float g, float b)
 {
     glDisable(GL_LIGHTING);
@@ -107,7 +97,6 @@ static void glowQuad(float x0, float y0, float x1, float y1, float r, float g, f
 
 static void frontEnd(void)
 {
-    /* Large upright grille: chrome frame, dark backing, chrome slats. */
     setMaterial(MAT_CHROME);
     roundedBox(2.615f, 0.62f, 0.0f, 0.05f, 0.30f, 0.62f, 8.0f);
     pushFrame(v3(2.641f, 0.62f, 0.0f), v3(1, 0, 0));
@@ -120,7 +109,6 @@ static void frontEnd(void)
         }
     glPopMatrix();
 
-    /* Slim headlamps, each with three LED strips across it. */
     for (int s = -1; s <= 1; s += 2) {
         Vec3 n, p = loftTop(&lower, 2.48f, s * 0.66f, &n);
         pushFrameFacing(p, n, v3(0.0f, 0.0f, (float)s));
@@ -138,7 +126,6 @@ static void frontEnd(void)
         glPopMatrix();
     }
 
-    /* Bumper with a chrome-barred lower intake. */
     setMaterial(MAT_PAINT);
     roundedBox(2.56f, 0.42f, 0.0f, 0.12f, 0.16f, 1.76f, 5.0f);
     pushFrame(v3(2.622f, 0.38f, 0.0f), v3(1, 0, 0));
@@ -147,13 +134,12 @@ static void frontEnd(void)
         setMaterial(MAT_CHROME);
         tube(v3(-0.48f, 0.0f, 0.006f), v3(0.48f, 0.0f, 0.006f), 0.007f, 0.007f, 6);
     glPopMatrix();
-    numberPlate(v3(2.626f, 0.41f, 0.0f), v3(1, 0, 0), 0.46f, 0.10f);   /* below the grille */
+    numberPlate(v3(2.626f, 0.41f, 0.0f), v3(1, 0, 0), 0.46f, 0.10f);
 }
 
 static void tail(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Wide, flat LED lamps running round the corners. */
         lampRect(v3(TAIL_X, 0.70f, s * 0.55f), v3(-1, 0, 0), 0.44f, 0.10f, 0.02f,
                  MAT_TAIL, MAT_GLOSS_BLACK);
         pushFrame(v3(TAIL_X - 0.009f, 0.70f, s * 0.55f), v3(-1, 0, 0));
@@ -163,7 +149,6 @@ static void tail(void)
         Vec3 n, p = loftSide(&lower, -2.47f, loftH(&lower, -2.47f, 0.70f), (float)s, &n);
         lampRect(p, n, 0.14f, 0.09f, 0.02f, MAT_TAIL, MAT_GLOSS_BLACK);
 
-        /* Exhaust outlets built into the rear apron. */
         lampRect(v3(TAIL_X - 0.02f, 0.40f, s * 0.55f), v3(-1, 0, 0), 0.22f, 0.06f, 0.02f,
                  MAT_MATTE, MAT_CHROME);
     }
@@ -172,9 +157,6 @@ static void tail(void)
     roundedBox(-2.47f, 0.42f, 0.0f, 0.12f, 0.12f, 1.74f, 5.0f);
 }
 
-/* The shoulder crease and the lower line, shown as lighter highlight
- * lines (on black paint a crease shows as a streak of reflected sky),
- * and the chrome strip low on the doors. */
 static void sculpting(void)
 {
     for (int s = -1; s <= 1; s += 2) {
@@ -225,9 +207,9 @@ static void buildGlass(const CarModel *m)
 
 void defineCar2013(CarModel *m)
 {
-    static const float paint[3]   = { 0.04f, 0.04f, 0.05f };   /* black        */
+    static const float paint[3]   = { 0.04f, 0.04f, 0.05f };
     static const float accent[3]  = { 0.10f, 0.10f, 0.10f };
-    static const float leather[3] = { 0.75f, 0.65f, 0.50f };   /* beige leather */
+    static const float leather[3] = { 0.75f, 0.65f, 0.50f };
 
     m->year = "2013";
     m->name = "S-Class (W222)";

@@ -4,11 +4,6 @@
 #include <string.h>
 #include "carparts.h"
 
-/* ------------------------------------------------------------------ */
-/* Flat shapes                                                         */
-/* ------------------------------------------------------------------ */
-
-/* Outline of a rounded rectangle: a quarter circle at each corner. */
 static int roundRectPts(float w, float h, float rad, Pt2 *out)
 {
     float hx = 0.5f * w - rad, hy = 0.5f * h - rad;
@@ -44,7 +39,6 @@ void teardropDisc(float a, float b, float taper)
         glVertex3f(0.0f, 0.0f, 0.0f);
         for (int i = 0; i <= 32; i++) {
             float t = 2.0f * (float)M_PI * i / 32;
-            /* An ellipse whose height shrinks towards the -x end. */
             float k = 1.0f - taper * 0.5f * (1.0f - cosf(t));
             glVertex3f(a * cosf(t), b * sinf(t) * k, 0.0f);
         }
@@ -61,7 +55,7 @@ void tubeLoop(const Vec3 *p, int n, float r)
 {
     for (int i = 0; i < n; i++) {
         tube(p[i], p[(i + 1) % n], r, r, 8);
-        ellipsoid(p[i].x, p[i].y, p[i].z, r, r, r);   /* round joint */
+        ellipsoid(p[i].x, p[i].y, p[i].z, r, r, r);
     }
 }
 
@@ -80,9 +74,6 @@ void roundRectLoop(float w, float h, float rad, float tubeR)
     tubeLoop(v, n, tubeR);
 }
 
-/* ------------------------------------------------------------------ */
-/* Underside and wheel wells                                           */
-/* ------------------------------------------------------------------ */
 void underbody(float x0, float x1, float y, float hw)
 {
     setMaterial(MAT_MATTE);
@@ -96,10 +87,6 @@ void underbody(float x0, float x1, float y, float hw)
 void archWell(float ax, float ay, float R, float zIn, float zOut, float sill)
 {
     setMaterial(MAT_MATTE);
-    /* Liner: a half cylinder just inside the arch edge, facing the
-     * axle, so the wheel sits in a dark opening instead of seeing
-     * through the body. Slightly smaller than the arch so it is in
-     * front of the body's own underside there. */
     float r = R - 0.008f;
     for (int s = -1; s <= 1; s += 2) {
         glBegin(GL_QUAD_STRIP);
@@ -111,27 +98,20 @@ void archWell(float ax, float ay, float R, float zIn, float zOut, float sill)
         }
         glEnd();
     }
-    /* Between the two wells: a dark block (engine bay, suspension). */
     float top = ay + R - 0.012f;
     if (top > sill)
         boxAt(ax, 0.5f * (sill + top), 0.0f, 2.0f * R, top - sill, 2.0f * zIn);
 }
 
-/* ------------------------------------------------------------------ */
-/* Lamps, plates, mirrors, handles, wipers, pipes                      */
-/* ------------------------------------------------------------------ */
 void headlampRound(Vec3 p, Vec3 n, float r, float depth, int housingMat, int ringMat)
 {
     pushFrame(p, n);
-        /* Housing behind the lens (from its back to the rim). */
         Pt2 body[] = { { 0.0f, -1.05f * depth }, { 0.6f * r, -depth },
                        { 1.05f * r, -0.15f * depth }, { 1.05f * r, 0.0f } };
         setMaterial(housingMat);
         revolve(body, COUNT(body), 24);
-        /* Trim ring: a torus lies in the local xy plane. */
         setMaterial(ringMat);
         glutSolidTorus(0.07 * r, r, 8, 28);
-        /* Lens: a shallow glowing dome. */
         Pt2 lens[] = { { 0.95f * r, 0.0f }, { 0.70f * r, 0.10f * r },
                        { 0.35f * r, 0.15f * r }, { 0.0f, 0.16f * r } };
         setMaterial(MAT_LAMP);
@@ -158,7 +138,7 @@ void numberPlate(Vec3 p, Vec3 n, float w, float h)
         setMaterial(MAT_PLASTIC);
         roundRectDisc(w + 0.02f, h + 0.02f, 0.012f);
         glTranslatef(0.0f, 0.0f, 0.002f);
-        setMaterial(MAT_PLATE);            /* deliberately blank */
+        setMaterial(MAT_PLATE);
         roundRectDisc(w, h, 0.008f);
     glPopMatrix();
 }
@@ -170,7 +150,6 @@ void sideMirror(Vec3 base, float side, int housingMat, int indicator)
     tube(base, v3(base.x - 0.02f, base.y + 0.06f, base.z + side * 0.13f), 0.018f, 0.013f, 8);
     roundedBox(base.x - 0.01f, hy, hz, 0.10f, 0.10f, 0.17f, 3.0f);
 
-    /* Mirror glass on the rear face. */
     pushFrame(v3(base.x - 0.062f, hy, hz), v3(-1.0f, 0.0f, 0.0f));
         setMaterialScaled(MAT_CHROME, 0.55f);
         roundRectDisc(0.15f, 0.08f, 0.02f);
@@ -219,8 +198,6 @@ void louvre(Vec3 p, Vec3 n, float w, float h, int slatMat)
         setMaterial(MAT_MATTE);
         glTranslatef(0.0f, 0.0f, 0.002f);
         quadXY(-0.5f * w, -0.5f * h, 0.5f * w, 0.5f * h);
-        /* Slat hinged along one edge and tilted out, so the slot
-         * underneath shows as a dark wedge. */
         setMaterial(slatMat);
         glTranslatef(-0.5f * w, 0.0f, 0.003f);
         glRotatef(-25.0f, 0.0f, 1.0f, 0.0f);
@@ -228,17 +205,13 @@ void louvre(Vec3 p, Vec3 n, float w, float h, int slatMat)
     glPopMatrix();
 }
 
-/* ------------------------------------------------------------------ */
-/* Interior and people                                                 */
-/* ------------------------------------------------------------------ */
 void seat(float x, float y, float z, float w, float depth, float backH,
           float rakeDeg, int headrest)
 {
     setMaterial(MAT_LEATHER);
-    roundedBox(x + 0.5f * depth, y - 0.06f, z, depth, 0.13f, w, 4.0f);   /* cushion */
+    roundedBox(x + 0.5f * depth, y - 0.06f, z, depth, 0.13f, w, 4.0f);
     glPushMatrix();
         glTranslatef(x, y, z);
-        /* A positive turn about z tips the back towards -x (rearwards). */
         glRotatef(rakeDeg, 0.0f, 0.0f, 1.0f);
         roundedBox(-0.05f, 0.5f * backH, 0.0f, 0.11f, backH, w, 4.0f);
         if (headrest)
@@ -265,15 +238,15 @@ void driverFigure(Vec3 hip, Vec3 wc, float wr, int goggles)
     float x = hip.x, y = hip.y, z = hip.z;
 
     setMaterial(MAT_CLOTH);
-    ellipsoid(x + 0.02f, y + 0.30f, z, 0.13f, 0.30f, 0.19f);           /* torso */
+    ellipsoid(x + 0.02f, y + 0.30f, z, 0.13f, 0.30f, 0.19f);
     for (int s = -1; s <= 1; s += 2) {
         Vec3 h0   = v3(x, y + 0.05f, z + s * 0.09f);
         Vec3 knee = v3(x + 0.42f, y + 0.08f, z + s * 0.10f);
         Vec3 foot = v3(x + 0.55f, y - 0.35f, z + s * 0.10f);
-        tube(h0, knee, 0.075f, 0.065f, 10);                            /* legs */
+        tube(h0, knee, 0.075f, 0.065f, 10);
         tube(knee, foot, 0.06f, 0.05f, 10);
 
-        Vec3 sh    = v3(x + 0.04f, y + 0.52f, z + s * 0.17f);         /* arms */
+        Vec3 sh    = v3(x + 0.04f, y + 0.52f, z + s * 0.17f);
         Vec3 hand  = v3(wc.x, wc.y, wc.z + s * 0.85f * wr);
         Vec3 elbow = vAdd(vScale(vAdd(sh, hand), 0.5f), v3(0.0f, -0.10f, s * 0.05f));
         setMaterial(MAT_CLOTH);
@@ -286,15 +259,15 @@ void driverFigure(Vec3 hip, Vec3 wc, float wr, int goggles)
 
     setMaterial(MAT_SKIN);
     tube(v3(x + 0.03f, y + 0.56f, z), v3(x + 0.03f, y + 0.63f, z), 0.045f, 0.045f, 10);
-    ellipsoid(x + 0.03f, y + 0.70f, z, 0.10f, 0.12f, 0.095f);          /* head */
+    ellipsoid(x + 0.03f, y + 0.70f, z, 0.10f, 0.12f, 0.095f);
 
-    setMaterialScaled(MAT_CLOTH, 0.5f);                                 /* cap */
+    setMaterialScaled(MAT_CLOTH, 0.5f);
     ellipsoid(x + 0.02f, y + 0.79f, z, 0.11f, 0.05f, 0.105f);
     roundedBox(x + 0.11f, y + 0.77f, z, 0.08f, 0.012f, 0.15f, 3.0f);
 
     if (goggles) {
         setMaterial(MAT_RUBBER);
-        ellipsoid(x + 0.03f, y + 0.72f, z, 0.104f, 0.024f, 0.099f);    /* strap */
+        ellipsoid(x + 0.03f, y + 0.72f, z, 0.104f, 0.024f, 0.099f);
         for (int s = -1; s <= 1; s += 2) {
             pushFrame(v3(x + 0.128f, y + 0.72f, z + s * 0.04f), v3(1.0f, 0.0f, 0.0f));
                 setMaterial(MAT_BRASS);
@@ -316,28 +289,17 @@ void drawCabin(const CabinSpec *c)
     if (c->rearSeatX != 0.0f)
         seat(c->rearSeatX, b - 0.20f, 0.0f, 1.25f, 0.50f, c->rearBackH, 16.0f, 0);
 
-    setMaterial(c->dashMat);                                            /* dashboard */
+    setMaterial(c->dashMat);
     roundedBox(c->dashX, b + 0.02f, 0.0f, 0.24f, 0.14f, 2.0f * c->dashHW, 4.0f);
-    setMaterial(MAT_PLASTIC);                                           /* gauge hood */
+    setMaterial(MAT_PLASTIC);
     roundedBox(c->dashX - 0.07f, b + 0.10f, -c->seatZ, 0.14f, 0.06f, 0.34f, 3.0f);
 
-    /* Steering wheel in front of the driver (left seat), its axis
-     * pointing back and up at the driver's chest. */
     Vec3 wc = v3(c->dashX - 0.30f, b + 0.10f, -c->seatZ);
     setMaterial(MAT_PLASTIC);
     tube(wc, v3(c->dashX - 0.08f, b - 0.02f, -c->seatZ), 0.025f, 0.03f, 8);
     steeringWheel(wc, v3(-0.85f, 0.53f, 0.0f), c->wheelR, MAT_PLASTIC, 3);
 }
 
-/* ------------------------------------------------------------------ */
-/* Closed cars                                                         */
-/* ------------------------------------------------------------------ */
-
-/* Sort a glasshouse quad: -1 hidden (faces down, inside the body),
- * 0 painted (roof, pillars), 1 glass. The windscreen and rear window
- * are the ends of the glasshouse; where those surfaces turn sideways
- * they become the A and C pillars. Along the sides, quads facing up are
- * the roof, and narrow bands at given x positions are the pillars. */
 static int quadClass(Vec3 c, Vec3 n, const GlassLayout *g)
 {
     if (n.y < -0.3f) return -1;
@@ -358,8 +320,6 @@ static int glassFilter(Vec3 c, Vec3 n, const void *ctx)
     return quadClass(c, n, (const GlassLayout *)ctx) == 1;
 }
 
-/* Height (as h) where the glasshouse side turns into the roof, found by
- * bisection on the surface normal. */
 static float roofEdgeH(const Loft *g, float x, float side, float ny)
 {
     float lo = 0.5f, hi = 0.995f;
@@ -392,11 +352,9 @@ void drawClosedCarCommon(const ClosedCar *c)
     underbody(c->axleX[1] + c->archR[1], c->axleX[0] - c->archR[0],
               c->sill - 0.004f, 0.85f * c->hw);
 
-    /* Dark interior floor under the glasshouse, seen through the glass. */
     setMaterial(MAT_PLASTIC);
     loftTopPatch(c->lower, g.x0 + 0.15f, g.x1 - 0.15f, -0.8f, 0.8f, 14, 8, 0.004f);
 
-    /* Window trim along the side glass: belt line, roof line, pillars. */
     float xa = gl->rwX, xb = gl->wsX;
     for (int s = -1; s <= 1; s += 2) {
         Pt2 belt[12], roof[12];
@@ -419,7 +377,6 @@ void drawClosedCarCommon(const ClosedCar *c)
             loftStrip(c->glass, pl, 2, 0, (float)s, 2.0f * gl->pillarHalfW + 0.01f, 0.003f);
         }
 
-        /* Door shut lines on the lower body. */
         setMaterial(MAT_MATTE);
         for (int i = 0; i < c->nDoorX; i++) {
             Pt2 d[2] = { { c->doorX[i], c->doorBottomH }, { c->doorX[i], c->doorTopH } };

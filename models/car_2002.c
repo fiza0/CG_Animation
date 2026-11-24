@@ -8,14 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 2002 E-Class (W211)                                                 */
-/*                                                                     */
-/* Sleeker evolution of the W210: arched roofline and sloping rear    */
-/* window. The twin ovals now sit together under one teardrop-shaped   */
-/* clear cover on each side. Raked grille, chrome strip around the     */
-/* side windows, larger rear lamps with clear and red sections.        */
-/* ------------------------------------------------------------------ */
 #define FX      1.427f
 #define RX     -1.427f
 #define WR      0.33f
@@ -52,7 +44,6 @@ static void lowerSection(float x, Section *s, const void *ctx)
     s->roundness = 3.4f;
 }
 
-/* Arched roof, long sloping rear window. */
 static const Pt2 glTop[] = {
     { -1.85f, 1.00f }, { -1.50f, 1.17f }, { -1.15f, 1.33f }, { -0.60f, 1.44f },
     { -0.10f, 1.45f }, {  0.25f, 1.41f }, {  0.60f, 1.20f }, {  0.98f, 0.93f },
@@ -89,16 +80,13 @@ static void setup(ClosedCar *c)
     c->doorX[0] = 0.80f; c->doorX[1] = -0.30f; c->doorX[2] = -1.12f; c->nDoorX = 3;
     c->doorTopH = 0.96f; c->doorBottomH = 0.20f;
     c->roofMat = MAT_PAINT;
-    c->beltMat = MAT_CHROME;                 /* chrome around the side windows */
+    c->beltMat = MAT_CHROME;
     c->roofTrimMat = MAT_CHROME;
     c->pillarTrimMat = MAT_GLOSS_BLACK;
     CabinSpec cab = { 0.93f, 0.53f, 0.70f, -0.32f, -1.20f, 0.38f, 0.40f, 1, MAT_PLASTIC, 0.19f };
     c->cabin = cab;
 }
 
-/* Headlamp unit: a teardrop bezel (wide end outboard) holding a larger
- * outer oval and a smaller inner one. The clear cover is in the glass
- * pass, so this only draws what is under it. */
 static void headlampUnit(float s)
 {
     Vec3 n, p = loftTop(&lower, 2.33f, s * 0.58f, &n);
@@ -121,10 +109,9 @@ static void frontEnd(void)
     for (int s = -1; s <= 1; s += 2) {
         headlampUnit((float)s);
         headlampRound(v3(2.452f, 0.38f, s * 0.62f), v3(1, 0, 0), 0.04f, 0.03f,
-                      MAT_PLASTIC, MAT_PLASTIC);                         /* fog lamps */
+                      MAT_PLASTIC, MAT_PLASTIC);
     }
 
-    /* Raked grille: it follows the steep slope of the nose. */
     Vec3 n, p = loftTop(&lower, 2.40f, 0.0f, &n);
     pushFrame(p, n);
         glTranslatef(0.0f, 0.0f, 0.004f);
@@ -149,7 +136,6 @@ static void frontEnd(void)
 static void tail(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Large lamps: red outer part, clear inner part, wrap piece. */
         lampRect(v3(TAIL_X, 0.64f, s * 0.56f), v3(-1, 0, 0), 0.30f, 0.18f, 0.03f, MAT_TAIL, MAT_PLASTIC);
         lampRect(v3(TAIL_X, 0.64f, s * 0.36f), v3(-1, 0, 0), 0.12f, 0.16f, 0.02f, MAT_PLATE, MAT_PLASTIC);
         Vec3 n, p = loftSide(&lower, -2.34f, loftH(&lower, -2.34f, 0.64f), (float)s, &n);
@@ -166,7 +152,7 @@ static void sides(void)
 {
     for (int s = -1; s <= 1; s += 2) {
         const float hx[2] = { 0.28f, -0.78f };
-        for (int i = 0; i < 2; i++) {                    /* body-colour handles */
+        for (int i = 0; i < 2; i++) {
             Vec3 n, p = loftSide(&lower, hx[i], 0.80f, (float)s, &n);
             doorHandle(p, n, 0.12f, MAT_PAINT);
         }
@@ -192,8 +178,6 @@ static void buildBody(const CarModel *m)
     sides();
 }
 
-/* Glass: the glasshouse, plus the clear teardrop headlamp covers. A
- * lighter tint than window glass, so the lamps show through. */
 static void buildGlass(const CarModel *m)
 {
     (void)m;
@@ -213,7 +197,7 @@ static void buildGlass(const CarModel *m)
 
 void defineCar2002(CarModel *m)
 {
-    static const float paint[3]   = { 0.74f, 0.75f, 0.77f };   /* silver */
+    static const float paint[3]   = { 0.74f, 0.75f, 0.77f };
     static const float accent[3]  = { 0.10f, 0.10f, 0.10f };
     static const float leather[3] = { 0.12f, 0.12f, 0.12f };
 

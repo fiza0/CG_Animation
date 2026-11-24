@@ -8,16 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 2021 EQS                                                            */
-/*                                                                     */
-/* "One-bow" shape: a single arc from the nose over the roof to a     */
-/* short tail with a small lip, with the cabin pushed far forward.     */
-/* No grille, just a gloss-black panel; light bands join the lamps    */
-/* across the front and across the rear. Flush handles, frameless      */
-/* windows, a black lower section and large aero wheels. Electric, so  */
-/* no exhaust.                                                         */
-/* ------------------------------------------------------------------ */
 #define FX      1.605f
 #define RX     -1.605f
 #define WR      0.37f
@@ -51,10 +41,9 @@ static void lowerSection(float x, Section *s, const void *ctx)
     s->yBottom = yb < s->yTop - 0.06f ? yb : s->yTop - 0.06f;
     s->halfWidth = curveY(lowHw, COUNT(lowHw), x);
     s->topHalfWidth = 0.86f * s->halfWidth;
-    s->roundness = 3.0f;                       /* very smooth surfaces */
+    s->roundness = 3.0f;
 }
 
-/* The bow: windscreen base far forward, one long arc to the tail. */
 static const Pt2 glTop[] = {
     { -2.20f, 1.04f }, { -1.90f, 1.17f }, { -1.50f, 1.33f }, { -1.00f, 1.45f },
     { -0.30f, 1.51f }, {  0.30f, 1.48f }, {  0.80f, 1.34f }, {  1.20f, 1.15f },
@@ -92,15 +81,13 @@ static void setup(ClosedCar *c)
     c->doorX[0] = 1.05f; c->doorX[1] = -0.25f; c->doorX[2] = -1.35f; c->nDoorX = 3;
     c->doorTopH = 0.97f; c->doorBottomH = 0.26f;
     c->roofMat = MAT_PAINT;
-    c->beltMat = MAT_RUBBER;                  /* frameless: only thin seals */
+    c->beltMat = MAT_RUBBER;
     c->roofTrimMat = MAT_GLOSS_BLACK;
     c->pillarTrimMat = MAT_GLOSS_BLACK;
     CabinSpec cab = { 1.00f, 0.95f, 0.76f, 0.00f, -0.95f, 0.42f, 0.42f, 1, MAT_GLOSS_BLACK, 0.18f };
     c->cabin = cab;
 }
 
-/* A light band laid along a row of surface points: a thin tube drawn
- * with lighting off, so it reads as glowing. */
 static void lightBand(const Vec3 *pts, int n, float r, float red, float green, float blue)
 {
     glDisable(GL_LIGHTING);
@@ -111,11 +98,9 @@ static void lightBand(const Vec3 *pts, int n, float r, float red, float green, f
 
 static void frontEnd(void)
 {
-    /* Gloss-black panel where a grille would be. */
     setMaterial(MAT_GLOSS_BLACK);
     loftTopPatch(&lower, 2.38f, 2.57f, -0.55f, 0.55f, 6, 10, 0.004f);
 
-    /* Light band across the front, ending in the slim headlamps. */
     Vec3 band[9];
     for (int i = 0; i < 9; i++) {
         float u = -0.80f + 1.60f * i / 8;
@@ -138,7 +123,6 @@ static void frontEnd(void)
         glPopMatrix();
     }
 
-    /* Black lower bumper with a blank plate. */
     setMaterial(MAT_GLOSS_BLACK);
     roundedBox(2.55f, 0.40f, 0.0f, 0.12f, 0.14f, 1.60f, 5.0f);
     numberPlate(v3(2.615f, 0.40f, 0.0f), v3(1, 0, 0), 0.46f, 0.10f);
@@ -146,7 +130,6 @@ static void frontEnd(void)
 
 static void tail(void)
 {
-    /* Continuous light band across the tail, joining the lamps. */
     Vec3 band[11];
     for (int i = 0; i < 11; i++) {
         float u = -0.92f + 1.84f * i / 10;
@@ -163,7 +146,6 @@ static void tail(void)
     }
     lightBand(band, 11, 0.010f, 1.0f, 0.10f, 0.08f);
 
-    /* Small lip at the end of the bow. */
     setMaterialScaled(MAT_PAINT, 0.85f);
     Pt2 lip[2] = { { -2.42f, -0.90f }, { -2.42f, 0.90f } };
     loftStrip(&lower, lip, 2, 1, 1.0f, 0.03f, 0.008f);
@@ -175,7 +157,6 @@ static void tail(void)
 
 static void sides(void)
 {
-    /* Black lower section along the sides, between and around the arches. */
     const float xs[3][2] = {
         { TAIL_X + 0.05f, RX - ARCH - 0.02f },
         { RX + ARCH + 0.02f, FX - ARCH - 0.02f },
@@ -186,7 +167,6 @@ static void sides(void)
         for (int i = 0; i < 3; i++)
             loftSidePatch(&lower, xs[i][0], xs[i][1], 0.03f, 0.25f, (float)s, 12, 4, 0.006f);
 
-        /* Flush door handles: just slots in the surface. */
         setMaterial(MAT_MATTE);
         const float hx[2] = { 0.40f, -0.70f };
         for (int i = 0; i < 2; i++) {
@@ -225,7 +205,7 @@ static void buildGlass(const CarModel *m)
 
 void defineCar2021(CarModel *m)
 {
-    static const float paint[3]   = { 0.88f, 0.89f, 0.90f };   /* silver-white */
+    static const float paint[3]   = { 0.88f, 0.89f, 0.90f };
     static const float accent[3]  = { 0.03f, 0.03f, 0.04f };
     static const float leather[3] = { 0.85f, 0.83f, 0.80f };
 

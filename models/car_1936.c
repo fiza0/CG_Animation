@@ -8,15 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 1936 540K Cabriolet, roof down                                      */
-/*                                                                     */
-/* Extremely long bonnet with outside exhaust pipes, a tall V-shaped   */
-/* chrome grille, separate flowing wings that sweep into running       */
-/* boards, free-standing chrome headlamps, side-mounted spare wheels,  */
-/* a low cockpit far back, a split V windscreen and a folded hood.     */
-/* Two-tone: cream body, black wings. Left-hand drive (driver at -z).  */
-/* ------------------------------------------------------------------ */
 #define FRONT_X   1.645f
 #define REAR_X   -1.645f
 #define WHEEL_R   0.40f
@@ -25,7 +16,6 @@
 #define BODY_HW   0.78f
 #define DRIVER_Z -0.36f
 
-/* Centre line of each wing, front tip to rear tip (y of its middle). */
 static const Vec3 wingPath[] = {
     {  2.44f, 0.55f, 0 }, {  2.28f, 0.76f, 0 }, {  2.02f, 0.93f, 0 }, {  1.645f, 0.99f, 0 },
     {  1.28f, 0.93f, 0 }, {  1.02f, 0.74f, 0 }, {  0.78f, 0.52f, 0 }, {  0.45f, 0.45f, 0 },
@@ -33,7 +23,6 @@ static const Vec3 wingPath[] = {
     { -1.98f, 0.90f, 0 }, { -2.25f, 0.70f, 0 }, { -2.40f, 0.52f, 0 },
 };
 
-/* Same line as y(x), ascending x, to find the wing height anywhere. */
 static float wingY(float x)
 {
     Pt2 p[COUNT(wingPath)];
@@ -45,7 +34,6 @@ static float wingY(float x)
     return curveY(p, n, x);
 }
 
-/* Long narrow bonnet. */
 static void bonnetSection(float x, Section *s, const void *ctx)
 {
     (void)ctx;
@@ -58,7 +46,6 @@ static void bonnetSection(float x, Section *s, const void *ctx)
 }
 static const Loft bonnet = { bonnetSection, NULL, 0.30f, 2.17f, 40, 28, 1, 1, NULL, NULL };
 
-/* Body: scuttle, cockpit dipping to the floor, rear deck, round tail. */
 static const Pt2 bodyTop[] = {
     { -2.58f, 0.70f }, { -2.48f, 0.88f }, { -2.20f, 0.98f }, { -1.30f, 1.00f },
     { -1.05f, 0.99f }, { -0.95f, 0.74f }, { -0.85f, 0.68f }, {  0.10f, 0.68f },
@@ -71,7 +58,7 @@ static void bodySection(float x, Section *s, const void *ctx)
 {
     (void)ctx;
     s->yTop = curveY(bodyTop, COUNT(bodyTop), x);
-    float yb = archBottom(x, REAR_X, 0.50f, WHEEL_R, 0.52f);   /* rear wheel arch */
+    float yb = archBottom(x, REAR_X, 0.50f, WHEEL_R, 0.52f);
     s->yBottom = yb < s->yTop - 0.06f ? yb : s->yTop - 0.06f;
     s->halfWidth = curveY(bodyHw, COUNT(bodyHw), x);
     s->topHalfWidth = 0.93f * s->halfWidth;
@@ -79,7 +66,6 @@ static void bodySection(float x, Section *s, const void *ctx)
 }
 static const Loft body = { bodySection, NULL, -2.58f, 0.30f, 64, 30, 1, 1, NULL, NULL };
 
-/* Frame rails, axles and the dark aprons under the bonnet sides. */
 static void chassis(void)
 {
     setMaterial(MAT_ACCENT);
@@ -93,9 +79,6 @@ static void chassis(void)
     underbody(-2.30f, 2.30f, 0.405f, 0.42f);
 }
 
-/* Wings: a flattened rounded section swept along the wing line on each
- * side. The same sweep forms the front wing, the running board and the
- * rear wing, so they flow into each other. */
 static void wings(void)
 {
     Pt2 sec[20];
@@ -111,14 +94,12 @@ static void wings(void)
         setMaterial(MAT_ACCENT);
         sweep(path, COUNT(wingPath), 90, sec, 20, v3(0, 0, 1), 1);
 
-        setMaterial(MAT_RUBBER);                 /* ribs on the running board */
+        setMaterial(MAT_RUBBER);
         for (int k = -1; k <= 1; k++)
             boxAt(-0.17f, 0.486f, s * (WING_Z + 0.08f * k), 1.15f, 0.008f, 0.025f);
     }
 }
 
-/* Bonnet: chrome centre hinge, louvres, and three flexible chrome
- * exhaust pipes leaving each side and diving into the wing. */
 static void bonnetDetails(void)
 {
     setMaterial(MAT_CHROME);
@@ -154,15 +135,12 @@ static void bonnetDetails(void)
     }
 }
 
-/* Tall V-shaped grille: two chrome-framed panels meeting at a point at
- * the front, each with vertical chrome slats. */
 static void grille(void)
 {
     const float ax = 2.27f, ex = 2.17f, hw = 0.30f, y0 = 0.56f, y1 = 1.10f;
     for (int s = -1; s <= 1; s += 2) {
         Vec3 A0 = v3(ax, y0, 0.0f), A1 = v3(ax, y1, 0.0f);
         Vec3 E0 = v3(ex, y0, s * hw), E1 = v3(ex, y1, s * hw);
-        /* Panel normal: up x (edge direction) points forward and out. */
         Vec3 n = vNorm(vCross(v3(0, 1, 0), vSub(E0, A0)));
         if (n.x < 0) n = vScale(n, -1.0f);
 
@@ -181,14 +159,14 @@ static void grille(void)
         }
         Vec3 loop[4] = { A0, E0, E1, A1 };
         tubeChain(loop, 4, 0.02f);
-        tube(E1, A1, 0.03f, 0.03f, 10);                      /* heavier top edge */
+        tube(E1, A1, 0.03f, 0.03f, 10);
     }
-    setMaterial(MAT_CHROME);                                 /* top cover */
+    setMaterial(MAT_CHROME);
     glNormal3f(0.0f, 1.0f, 0.0f);
     glBegin(GL_TRIANGLES);
         glVertex3f(ax, y1, 0.0f); glVertex3f(ex, y1, -hw); glVertex3f(ex, y1, hw);
     glEnd();
-    tube(v3(ax, y0, 0.0f), v3(ax, y1 + 0.01f, 0.0f), 0.022f, 0.022f, 10);   /* nose spine */
+    tube(v3(ax, y0, 0.0f), v3(ax, y1 + 0.01f, 0.0f), 0.022f, 0.022f, 10);
     pushFrame(v3(2.23f, y1 + 0.01f, 0.0f), v3(0.0f, 1.0f, 0.0f));
         Pt2 cap[] = { { 0.045f, 0.0f }, { 0.045f, 0.03f }, { 0.045f, 0.03f },
                       { 0.03f, 0.05f }, { 0.0f, 0.055f } };
@@ -196,7 +174,6 @@ static void grille(void)
     glPopMatrix();
 }
 
-/* Headlamps on a cross bar, fog lamps, twin horns and the bumpers. */
 static void frontEnd(void)
 {
     setMaterial(MAT_CHROME);
@@ -206,11 +183,10 @@ static void frontEnd(void)
         tube(v3(2.22f, 0.80f, s * 0.56f), v3(2.18f, 0.87f, s * 0.56f), 0.02f, 0.02f, 8);
         headlampRound(v3(2.24f, 1.00f, s * 0.56f), v3(1, 0, 0), 0.15f, 0.22f, MAT_CHROME, MAT_CHROME);
 
-        setMaterial(MAT_CHROME);                       /* fog lamps on stems */
+        setMaterial(MAT_CHROME);
         tube(v3(2.36f, 0.58f, s * 0.30f), v3(2.50f, 0.48f, s * 0.30f), 0.012f, 0.012f, 8);
         headlampRound(v3(2.40f, 0.62f, s * 0.30f), v3(1, 0, 0), 0.075f, 0.12f, MAT_CHROME, MAT_CHROME);
 
-        /* Horn: a trumpet flaring towards the front. */
         pushFrame(v3(2.34f, 0.74f, s * 0.40f), v3(1, 0, 0));
             setMaterial(MAT_CHROME);
             Pt2 horn[] = { { 0.02f, -0.25f }, { 0.03f, -0.10f }, { 0.075f, 0.0f } };
@@ -221,7 +197,6 @@ static void frontEnd(void)
         glPopMatrix();
     }
 
-    /* Double-blade chrome bumpers, curving back at the ends. */
     setMaterial(MAT_CHROME);
     for (int k = 0; k < 2; k++) {
         float y = k ? 0.40f : 0.48f, r = k ? 0.028f : 0.035f;
@@ -239,8 +214,6 @@ static void frontEnd(void)
     }
 }
 
-/* Spare wheel standing against the outside of each front wing, behind
- * the front wheel, with a domed cover and a chrome ring. */
 static void spareWheels(const CarModel *m)
 {
     for (int s = -1; s <= 1; s += 2) {
@@ -259,11 +232,9 @@ static void spareWheels(const CarModel *m)
     }
 }
 
-/* Cockpit: door walls with leather rolls, seats, wooden dashboard,
- * thin-rimmed steering wheel, folded hood, windscreen frame, driver. */
 static void cockpit(void)
 {
-    setMaterialScaled(MAT_LEATHER, 0.5f);                         /* carpet */
+    setMaterialScaled(MAT_LEATHER, 0.5f);
     loftTopPatch(&body, -0.90f, 0.12f, -0.9f, 0.9f, 10, 8, 0.004f);
 
     for (int s = -1; s <= 1; s += 2) {
@@ -272,10 +243,10 @@ static void cockpit(void)
         setMaterial(MAT_LEATHER);
         tube(v3(-0.95f, 1.00f, s * 0.72f), v3(0.22f, 1.00f, s * 0.72f), 0.03f, 0.03f, 10);
         pushFrame(v3(-0.365f, 0.84f, s * (BODY_HW - 0.081f)), v3(0, 0, (float)-s));
-            roundRectDisc(1.10f, 0.28f, 0.04f);                       /* door lining */
+            roundRectDisc(1.10f, 0.28f, 0.04f);
         glPopMatrix();
 
-        setMaterial(MAT_MATTE);                                       /* door shut lines */
+        setMaterial(MAT_MATTE);
         const float gx[2] = { -0.55f, 0.18f };
         for (int i = 0; i < 2; i++) {
             pushFrame(v3(gx[i], 0.83f, s * (BODY_HW + 0.002f)), v3(0, 0, (float)s));
@@ -286,7 +257,7 @@ static void cockpit(void)
         seat(-0.55f, 0.82f, s * 0.36f, 0.58f, 0.55f, 0.45f, 12.0f, 0);
     }
 
-    setMaterial(MAT_WOOD);                                            /* dashboard */
+    setMaterial(MAT_WOOD);
     roundedBox(0.16f, 0.95f, 0.0f, 0.10f, 0.20f, 1.40f, 6.0f);
     const float gz[3] = { -0.45f, -0.25f, 0.20f };
     for (int i = 0; i < 3; i++) {
@@ -303,13 +274,12 @@ static void cockpit(void)
     tube(wc, v3(0.14f, 0.88f, DRIVER_Z), 0.022f, 0.022f, 8);
     steeringWheel(wc, vNorm(v3(-0.75f, 0.66f, 0.0f)), 0.22f, MAT_PLASTIC, 4);
 
-    setMaterial(MAT_PLASTIC);                                         /* folded hood */
+    setMaterial(MAT_PLASTIC);
     ellipsoid(-1.12f, 1.06f, 0.0f, 0.26f, 0.15f, 0.74f);
     setMaterial(MAT_CHROME);
     for (int s = -1; s <= 1; s += 2)
         tube(v3(-1.02f, 1.00f, s * 0.74f), v3(-1.26f, 1.12f, s * 0.74f), 0.015f, 0.015f, 8);
 
-    /* Windscreen frame: two panes forming a V, chrome all round. */
     for (int s = -1; s <= 1; s += 2) {
         Vec3 f[4] = { v3(0.32f, 1.06f, 0.0f), v3(0.22f, 1.06f, s * 0.72f),
                       v3(0.10f, 1.42f, s * 0.70f), v3(0.20f, 1.42f, 0.0f) };
@@ -320,8 +290,6 @@ static void cockpit(void)
     driverFigure(v3(-0.42f, 0.86f, DRIVER_Z), wc, 0.22f, 0);
 }
 
-/* Tail: luggage trunk with chrome straps, small round tail lamps on the
- * rear wings, tailpipe. */
 static void tail(void)
 {
     setMaterial(MAT_ACCENT);
@@ -351,7 +319,6 @@ static void buildBody(const CarModel *m)
     tail();
 }
 
-/* The two windscreen panes. */
 static void buildGlass(const CarModel *m)
 {
     (void)m;
@@ -371,9 +338,9 @@ static void buildGlass(const CarModel *m)
 
 void defineCar1936(CarModel *m)
 {
-    static const float paint[3]   = { 0.90f, 0.85f, 0.70f };   /* cream body  */
-    static const float accent[3]  = { 0.04f, 0.04f, 0.05f };   /* black wings */
-    static const float leather[3] = { 0.55f, 0.12f, 0.10f };   /* red leather */
+    static const float paint[3]   = { 0.90f, 0.85f, 0.70f };
+    static const float accent[3]  = { 0.04f, 0.04f, 0.05f };
+    static const float leather[3] = { 0.55f, 0.12f, 0.10f };
 
     m->year = "1936";
     m->name = "540K Cabriolet";
@@ -386,7 +353,6 @@ void defineCar1936(CarModel *m)
     m->axleX[0] = FRONT_X;  m->axleX[1] = REAR_X;
     m->track[0] = TRACK;    m->track[1] = TRACK;
 
-    /* Tall chrome wire wheels with fat, high-sidewall tyres. */
     WheelSpec w = { WHEEL_R, 0.17f, 0.23f, RIM_WIRE, MAT_CHROME, 0 };
     m->wheel[0] = w;
     m->wheel[1] = w;

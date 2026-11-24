@@ -8,14 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 1976 W123 E-Class                                                   */
-/*                                                                     */
-/* Upright, boxy three-box saloon with a tall glasshouse, thin chrome- */
-/* framed pillars and a small rear quarter window. Wide rectangular    */
-/* headlamp units beside a tall flat-topped chrome grille, chrome      */
-/* bumpers with thick rubber strips, ribbed tail lamps.                */
-/* ------------------------------------------------------------------ */
 #define FX      1.40f
 #define RX     -1.40f
 #define WR      0.32f
@@ -47,7 +39,7 @@ static void lowerSection(float x, Section *s, const void *ctx)
     s->yBottom = yb < s->yTop - 0.06f ? yb : s->yTop - 0.06f;
     s->halfWidth = curveY(lowHw, COUNT(lowHw), x);
     s->topHalfWidth = 0.95f * s->halfWidth;
-    s->roundness = 8.0f;                         /* boxy */
+    s->roundness = 8.0f;
 }
 
 static const Pt2 glTop[] = {
@@ -73,7 +65,6 @@ static void setup(ClosedCar *c)
     memset(c, 0, sizeof *c);
     c->lower = &lower;
     c->glass = &glass;
-    /* B pillar, plus a C pillar that cuts off the small quarter window. */
     GlassLayout gl = { 0.40f, -0.98f, { -0.22f, -0.80f, 0.0f }, 2, 0.04f, 0.45f, 0.45f };
     c->layout = gl;
     c->beltY = beltY;
@@ -93,8 +84,6 @@ static void setup(ClosedCar *c)
     c->cabin = cab;
 }
 
-/* Chrome bumper blade with a thick black rubber strip along its face.
- * The section is swept along a path running across the car. */
 static void bumper(float x, float y, float dir)
 {
     Pt2 blade[16], rubber[16];
@@ -119,7 +108,6 @@ static void bumper(float x, float y, float dir)
 static void frontEnd(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Wide unit: fog lamp inboard, headlamp, indicator outboard. */
         float zc = s * 0.58f;
         setMaterial(MAT_CHROME);
         roundedBox(2.275f, 0.66f, zc, 0.04f, 0.22f, 0.44f, 8.0f);
@@ -128,7 +116,6 @@ static void frontEnd(void)
         lampRect(v3(2.297f, 0.66f, s * 0.765f), v3(1, 0, 0), 0.06f, 0.16f, 0.01f, MAT_INDICATOR, MAT_PLASTIC);
     }
 
-    /* Tall, flat-topped chrome grille standing proud of the bonnet. */
     setMaterial(MAT_CHROME);
     roundedBox(2.285f, 0.68f, 0.0f, 0.06f, 0.40f, 0.40f, 8.0f);
     pushFrame(v3(2.316f, 0.67f, 0.0f), v3(1, 0, 0));
@@ -142,15 +129,12 @@ static void frontEnd(void)
     glPopMatrix();
 
     bumper(2.28f, 0.42f, 1.0f);
-    numberPlate(v3(2.365f, 0.42f, 0.0f), v3(1, 0, 0), 0.46f, 0.11f);   /* on the rubber strip */
+    numberPlate(v3(2.365f, 0.42f, 0.0f), v3(1, 0, 0), 0.46f, 0.11f);
 }
 
 static void tail(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Large ribbed lamp unit: red, amber outboard, white reverse
-         * inboard, with raised horizontal ridges across the lens (they
-         * shed dirt, so the lamps stay visible). */
         float zc = s * 0.55f;
         lampRect(v3(TAIL_X, 0.60f, zc), v3(-1, 0, 0), 0.46f, 0.24f, 0.02f, MAT_TAIL, MAT_CHROME);
         lampRect(v3(TAIL_X - 0.002f, 0.60f, s * 0.71f), v3(-1, 0, 0), 0.12f, 0.22f, 0.015f,
@@ -171,7 +155,7 @@ static void tail(void)
 static void sides(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        setMaterial(MAT_PLASTIC);                                       /* rubbing strip */
+        setMaterial(MAT_PLASTIC);
         Pt2 strip[2] = { { -1.95f, 0.42f }, { 2.00f, 0.42f } };
         loftStrip(&lower, strip, 2, 0, (float)s, 0.035f, 0.006f);
 
@@ -212,9 +196,9 @@ static void buildGlass(const CarModel *m)
 
 void defineCar1976(CarModel *m)
 {
-    static const float paint[3]   = { 0.80f, 0.72f, 0.55f };   /* beige       */
+    static const float paint[3]   = { 0.80f, 0.72f, 0.55f };
     static const float accent[3]  = { 0.10f, 0.10f, 0.10f };
-    static const float leather[3] = { 0.42f, 0.26f, 0.14f };   /* tan vinyl   */
+    static const float leather[3] = { 0.42f, 0.26f, 0.14f };
 
     m->year = "1976";
     m->name = "W123 E-Class";

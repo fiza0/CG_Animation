@@ -6,14 +6,8 @@
 #include "geom.h"
 #include "materials.h"
 
-#define SEGS 40   /* points around a wheel */
+#define SEGS 40
 
-/* All wheel parts are built around the axle (the z axis) with the
- * outer face towards +z. Revolved profiles are (r, z) pairs; walking
- * from the outer edge towards the centre gives normals facing +z. */
-
-/* Height (z) of a profile at radius r, by straight-line interpolation,
- * so decals and ribs can sit exactly on a dished disc. */
 static float profileZ(const Pt2 *p, int n, float r)
 {
     for (int i = 0; i + 1 < n; i++) {
@@ -25,17 +19,12 @@ static float profileZ(const Pt2 *p, int n, float r)
     return p[n - 1].y;
 }
 
-/* ------------------------------------------------------------------ */
-/* Tyre: rounded shoulders and bulging sidewalls                       */
-/* ------------------------------------------------------------------ */
 static void tyre(const WheelSpec *w)
 {
     float R = w->radius, Rr = w->rimRadius, hw = 0.5f * w->width;
     float side = R - Rr;
-    float c = fminf(0.35f * side, 0.45f * hw);   /* shoulder rounding */
+    float c = fminf(0.35f * side, 0.45f * hw);
 
-    /* Inner sidewall (-z) out to the tread and back down the outer
-     * sidewall (+z). Normals (dz, -dr) then point out of the rubber. */
     Pt2 p[] = {
         { Rr,                -0.80f * hw },
         { Rr + 0.30f * side, -hw },
@@ -52,7 +41,6 @@ static void tyre(const WheelSpec *w)
     revolve(p, COUNT(p), SEGS);
 
     if (w->treads) {
-        /* Grooves: thin black bands just proud of the tread. */
         setMaterial(MAT_MATTE);
         const float zs[3] = { -0.32f, 0.0f, 0.32f };
         for (int i = 0; i < 3; i++) {
@@ -63,30 +51,26 @@ static void tyre(const WheelSpec *w)
     }
 }
 
-/* Inside of the rim seen through spokes or around a disc. */
 static void rimBarrel(float Rr, float hw, int mat)
 {
-    /* Travelling towards -z at constant r gives normals pointing in. */
     Pt2 p[] = { { Rr, 0.75f * hw }, { Rr - 0.01f, 0.65f * hw },
                 { Rr - 0.01f, -0.65f * hw }, { Rr, -0.75f * hw } };
     setMaterial(mat);
     revolve(p, COUNT(p), SEGS);
 }
 
-/* Dark disc that closes the back of a wheel so it is not see-through. */
 static void backPlate(float r, float z)
 {
     setMaterial(MAT_MATTE);
     glPushMatrix();
         glTranslatef(0.0f, 0.0f, z);
-        glRotatef(180.0f, 0.0f, 1.0f, 0.0f);   /* face -z */
+        glRotatef(180.0f, 0.0f, 1.0f, 0.0f);
         disc(r, SEGS);
-        glRotatef(180.0f, 0.0f, 1.0f, 0.0f);   /* and +z, seen through gaps */
+        glRotatef(180.0f, 0.0f, 1.0f, 0.0f);
         disc(r, SEGS);
     glPopMatrix();
 }
 
-/* Hub drum with domed ends, length 2L along the axle. */
 static void hubDrum(float hr, float L, int mat)
 {
     Pt2 p[] = { { 0.0f, -L - 0.01f }, { hr, -L }, { hr, -L },
@@ -95,13 +79,6 @@ static void hubDrum(float hr, float L, int mat)
     revolve(p, COUNT(p), 16);
 }
 
-/* ------------------------------------------------------------------ */
-/* Rim styles                                                          */
-/* ------------------------------------------------------------------ */
-
-/* Wire wheel: thin rim, long hub, spokes laced from alternate ends of
- * the hub to the rim, each one leaning a little ahead or behind, which
- * gives the crossed pattern of a real wire wheel. */
 static void wireRim(const WheelSpec *w)
 {
     float R = w->radius, Rr = w->rimRadius, hw = 0.5f * w->width;
@@ -124,21 +101,17 @@ static void wireRim(const WheelSpec *w)
         tube(a, b, 0.0045f, 0.0045f, 5);
     }
 
-    /* Chrome centre-lock cap on the outer end of the hub. */
     setMaterial(MAT_CHROME);
     Pt2 cap[] = { { hr * 1.3f, L }, { hr * 1.2f, L + 0.02f }, { 0.0f, L + 0.03f } };
     revolve(cap, COUNT(cap), 16);
 }
 
-/* Artillery wheel: wooden felloe (outer ring), thick tapered spokes,
- * wooden hub and a brass cap. */
 static void artilleryRim(const WheelSpec *w)
 {
     float R = w->radius, Rr = w->rimRadius, hw = 0.5f * w->width;
     float fr = Rr - 0.06f, fw = 1.1f * hw;
     float hr = 0.17f * R;
 
-    /* Felloe cross-section: front face, inner face, back face. */
     Pt2 felloe[] = { { Rr, fw }, { fr, fw }, { fr, fw }, { fr, -fw },
                      { fr, -fw }, { Rr, -fw } };
     setMaterial(MAT_WOOD);
@@ -148,7 +121,7 @@ static void artilleryRim(const WheelSpec *w)
         float ph = 2.0f * (float)M_PI * i / 12;
         Vec3 a = v3(hr * 0.9f * cosf(ph), hr * 0.9f * sinf(ph), 0.0f);
         Vec3 b = v3((fr + 0.005f) * cosf(ph), (fr + 0.005f) * sinf(ph), 0.0f);
-        tubeCapped(a, b, 0.065f * R, 0.04f * R, 8);   /* taper outwards */
+        tubeCapped(a, b, 0.065f * R, 0.04f * R, 8);
     }
 
     hubDrum(hr, 1.3f * hw, MAT_WOOD);
@@ -158,7 +131,6 @@ static void artilleryRim(const WheelSpec *w)
     revolve(cap, COUNT(cap), 16);
 }
 
-/* Painted steel disc, chrome trim ring, domed chrome hubcap. */
 static void steelCapRim(const WheelSpec *w)
 {
     float Rr = w->rimRadius, hw = 0.5f * w->width;
@@ -182,7 +154,6 @@ static void steelCapRim(const WheelSpec *w)
     revolve(cap, COUNT(cap), SEGS);
 }
 
-/* Full chrome hubcap with raised radial ribs and a painted centre. */
 static void ribbedCapRim(const WheelSpec *w)
 {
     float Rr = w->rimRadius, hw = 0.5f * w->width;
@@ -211,7 +182,6 @@ static void ribbedCapRim(const WheelSpec *w)
     glPopMatrix();
 }
 
-/* Flat silver alloy disc with a ring of round dark holes. */
 static void holeRim(const WheelSpec *w, int holes, float holeR, float ringR,
                     float stretch)
 {
@@ -226,8 +196,6 @@ static void holeRim(const WheelSpec *w, int holes, float holeR, float ringR,
     setMaterial(MAT_METAL);
     revolve(face, COUNT(face), SEGS);
 
-    /* Holes: dark ovals sitting just on the face. A slightly larger,
-     * darker grey ring around each one suggests the recess. */
     float z = profileZ(face, COUNT(face), ringR * Rr);
     for (int i = 0; i < holes; i++) {
         glPushMatrix();
@@ -241,7 +209,6 @@ static void holeRim(const WheelSpec *w, int holes, float holeR, float ringR,
         glPopMatrix();
     }
 
-    /* Five lug nuts and a centre cap. */
     float zc = profileZ(face, COUNT(face), 0.28f * Rr);
     setMaterial(MAT_DARK_METAL);
     for (int i = 0; i < 5; i++) {
@@ -255,7 +222,6 @@ static void holeRim(const WheelSpec *w, int holes, float holeR, float ringR,
     revolve(cap, COUNT(cap), 20);
 }
 
-/* Spoked alloy: dark barrel, brake disc, then flat-topped spokes. */
 static void spokeRim(const WheelSpec *w, int pairs, int perPair, float spread,
                      float spokeW)
 {
@@ -264,7 +230,6 @@ static void spokeRim(const WheelSpec *w, int pairs, int perPair, float spread,
     rimBarrel(Rr, hw, MAT_DARK_METAL);
     backPlate(Rr, -0.7f * hw);
 
-    /* Brake disc: turns with the wheel, sits behind the spokes. */
     setMaterial(MAT_METAL);
     glPushMatrix();
         glTranslatef(0.0f, 0.0f, -0.15f * hw);
@@ -273,13 +238,11 @@ static void spokeRim(const WheelSpec *w, int pairs, int perPair, float spread,
     setMaterial(MAT_DARK_METAL);
     hubDrum(0.24f * Rr, 0.15f * hw, MAT_DARK_METAL);
 
-    /* Rim lip. */
     Pt2 lip[] = { { 1.00f * Rr, 0.55f * hw }, { 0.96f * Rr, 0.50f * hw },
                   { 0.90f * Rr, 0.42f * hw } };
     setMaterial(MAT_METAL);
     revolve(lip, COUNT(lip), SEGS);
 
-    /* Spokes: rounded bars from the centre to the rim. */
     for (int k = 0; k < pairs; k++) {
         for (int j = 0; j < perPair; j++) {
             float off = (perPair == 2) ? (j ? spread : -spread) : 0.0f;
@@ -292,14 +255,11 @@ static void spokeRim(const WheelSpec *w, int pairs, int perPair, float spread,
         }
     }
 
-    /* Centre: hub disc and a small cap. */
     Pt2 hub[] = { { 0.24f * Rr, 0.36f * hw }, { 0.20f * Rr, 0.46f * hw },
                   { 0.08f * Rr, 0.50f * hw }, { 0.0f, 0.51f * hw } };
     revolve(hub, COUNT(hub), 24);
 }
 
-/* Aero wheel: a nearly closed gloss black disc with a silver lip,
- * five silver blades and shallow dark slots between them. */
 static void aeroRim(const WheelSpec *w)
 {
     float Rr = w->rimRadius, hw = 0.5f * w->width;
@@ -321,7 +281,6 @@ static void aeroRim(const WheelSpec *w)
     for (int i = 0; i < 5; i++) {
         glPushMatrix();
             glRotatef(72.0f * i, 0.0f, 0.0f, 1.0f);
-            /* Silver blade: a wedge from the centre towards the rim. */
             setMaterial(MAT_METAL);
             glNormal3f(0.0f, 0.0f, 1.0f);
             glBegin(GL_QUADS);
@@ -330,7 +289,6 @@ static void aeroRim(const WheelSpec *w)
                 glVertex3f(0.84f * Rr,  0.02f * Rr, z);
                 glVertex3f(0.22f * Rr,  0.04f * Rr, z);
             glEnd();
-            /* Shallow slot, turned 36 degrees to sit between blades. */
             glRotatef(36.0f, 0.0f, 0.0f, 1.0f);
             glTranslatef(0.66f * Rr, 0.0f, z + 0.001f);
             setMaterial(MAT_MATTE);
@@ -345,22 +303,18 @@ static void aeroRim(const WheelSpec *w)
     glPopMatrix();
 }
 
-/* Brake calliper: does not turn, sits over the disc at the upper rear. */
 static void calliper(const WheelSpec *w)
 {
     float Rr = w->rimRadius, hw = 0.5f * w->width;
     setMaterial(MAT_DARK_METAL);
     glPushMatrix();
         glRotatef(150.0f, 0.0f, 0.0f, 1.0f);
-        /* Straddles the brake disc (z = -0.15 hw) but stays behind the
-         * spokes, which pass in front of it as the wheel turns. */
         glTranslatef(0.70f * Rr, 0.0f, -0.20f * hw);
-        glRotatef(90.0f, 0.0f, 0.0f, 1.0f);   /* long side runs round the disc */
+        glRotatef(90.0f, 0.0f, 0.0f, 1.0f);
         roundedBox(0.0f, 0.0f, 0.0f, 0.30f * Rr, 0.15f * Rr, 0.05f, 3.0f);
     glPopMatrix();
 }
 
-/* ------------------------------------------------------------------ */
 void buildWheel(const WheelSpec *w, WheelLists *out)
 {
     out->spin = glGenLists(1);
@@ -393,13 +347,8 @@ void buildWheel(const WheelSpec *w, WheelLists *out)
 void drawWheel(const WheelLists *wl, float angleDeg, int farSide)
 {
     glPushMatrix();
-        /* Mirroring in z keeps the turning direction (a mirror across
-         * the axle's own axis does not reverse a spin about that axis)
-         * and puts the outer face on the -z side. */
         if (farSide) glScalef(1.0f, 1.0f, -1.0f);
         glPushMatrix();
-            /* Rolling forward (+x) is a clockwise turn seen from +z,
-             * which is a negative rotation about the axle. */
             glRotatef(-angleDeg, 0.0f, 0.0f, 1.0f);
             glCallList(wl->spin);
         glPopMatrix();

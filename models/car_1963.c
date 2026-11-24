@@ -8,14 +8,6 @@
 #include "../carparts.h"
 #include "models.h"
 
-/* ------------------------------------------------------------------ */
-/* 1963 230 SL "Pagoda"                                                */
-/*                                                                     */
-/* Compact, crisp roadster with slab sides and a flat bonnet. Tall     */
-/* stacked headlamp units, a wide low grille with one bar, and a white */
-/* hardtop with very thin pillars and a dished ("pagoda") roof, raised */
-/* along both edges and lower in the middle.                          */
-/* ------------------------------------------------------------------ */
 #define FX     1.20f
 #define RX    -1.20f
 #define WR     0.33f
@@ -48,10 +40,9 @@ static void lowerSection(float x, Section *s, const void *ctx)
     s->yBottom = yb < s->yTop - 0.06f ? yb : s->yTop - 0.06f;
     s->halfWidth = curveY(lowHw, COUNT(lowHw), x);
     s->topHalfWidth = 0.95f * s->halfWidth;
-    s->roundness = 7.0f;                 /* crisp, slab-sided */
+    s->roundness = 7.0f;
 }
 
-/* Hardtop: upright screen, short flat roof, steep rear window. */
 static const Pt2 glTop[] = {
     { -1.12f, 0.86f }, { -1.00f, 1.10f }, { -0.92f, 1.24f }, { -0.80f, 1.29f },
     {  0.00f, 1.30f }, {  0.12f, 1.28f }, {  0.30f, 1.05f }, {  0.42f, 0.86f },
@@ -86,7 +77,7 @@ static void setup(ClosedCar *c)
     c->wellDepth = HW - (TRACK - 0.5f * WW - 0.06f);
     c->doorX[0] = 0.38f; c->doorX[1] = -0.78f; c->nDoorX = 2;
     c->doorTopH = 0.95f; c->doorBottomH = 0.20f;
-    c->roofMat = MAT_ACCENT;                 /* white hardtop */
+    c->roofMat = MAT_ACCENT;
     c->beltMat = MAT_CHROME;
     c->roofTrimMat = MAT_CHROME;
     c->pillarTrimMat = MAT_ACCENT;
@@ -94,8 +85,6 @@ static void setup(ClosedCar *c)
     c->cabin = cab;
 }
 
-/* The pagoda roof: raised rails along both edges make the middle look
- * dished; the middle panel is also a touch darker, as if in shadow. */
 static void pagodaRoof(void)
 {
     setMaterialScaled(MAT_ACCENT, 0.88f);
@@ -122,8 +111,6 @@ static void pagodaRoof(void)
 static void frontEnd(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Stacked unit: headlamp above a fog lamp above an indicator,
-         * all inside one tall chrome-framed housing. */
         float z = s * 0.60f;
         setMaterial(MAT_CHROME);
         roundedBox(2.18f, 0.56f, z, 0.05f, 0.30f, 0.20f, 6.0f);
@@ -132,7 +119,6 @@ static void frontEnd(void)
         lampRect(v3(2.205f, 0.45f, z), v3(1, 0, 0), 0.14f, 0.04f, 0.015f, MAT_INDICATOR, MAT_CHROME);
     }
 
-    /* Wide, low grille: dark recess, chrome frame, one horizontal bar. */
     pushFrame(v3(NOSE_X + 0.003f, 0.50f, 0.0f), v3(1, 0, 0));
         setMaterial(MAT_MATTE);
         roundRectDisc(0.80f, 0.20f, 0.04f);
@@ -142,7 +128,6 @@ static void frontEnd(void)
         tube(v3(-0.40f, 0.0f, 0.01f), v3(0.40f, 0.0f, 0.01f), 0.018f, 0.018f, 10);
     glPopMatrix();
 
-    /* Chrome bumpers with tall vertical overriders. */
     setMaterial(MAT_CHROME);
     Vec3 fb[7] = { v3(2.00f, 0.33f, -0.86f), v3(2.15f, 0.33f, -0.74f), v3(2.20f, 0.33f, -0.40f),
                    v3(2.21f, 0.33f, 0.0f),   v3(2.20f, 0.33f, 0.40f),  v3(2.15f, 0.33f, 0.74f),
@@ -162,7 +147,6 @@ static void frontEnd(void)
 static void tail(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        /* Upright tail lamps: red below, amber on top. */
         float z = s * 0.62f;
         lampRect(v3(TAIL_X, 0.54f, z), v3(-1, 0, 0), 0.12f, 0.16f, 0.02f, MAT_TAIL, MAT_CHROME);
         lampRect(v3(TAIL_X, 0.66f, z), v3(-1, 0, 0), 0.12f, 0.06f, 0.015f, MAT_INDICATOR, MAT_CHROME);
@@ -174,7 +158,7 @@ static void tail(void)
 static void sides(void)
 {
     for (int s = -1; s <= 1; s += 2) {
-        setMaterial(MAT_CHROME);                                       /* side strip */
+        setMaterial(MAT_CHROME);
         Pt2 strip[2] = { { -1.95f, 0.55f }, { 1.95f, 0.55f } };
         loftStrip(&lower, strip, 2, 0, (float)s, 0.012f, 0.004f);
 
@@ -213,9 +197,9 @@ static void buildGlass(const CarModel *m)
 
 void defineCar1963(CarModel *m)
 {
-    static const float paint[3]   = { 0.62f, 0.76f, 0.88f };   /* light blue     */
-    static const float accent[3]  = { 0.94f, 0.94f, 0.92f };   /* white hardtop  */
-    static const float leather[3] = { 0.55f, 0.30f, 0.15f };   /* cognac leather */
+    static const float paint[3]   = { 0.62f, 0.76f, 0.88f };
+    static const float accent[3]  = { 0.94f, 0.94f, 0.92f };
+    static const float leather[3] = { 0.55f, 0.30f, 0.15f };
 
     m->year = "1963";
     m->name = "230 SL Pagoda";
